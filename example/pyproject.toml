@@ -1,0 +1,38 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "yh-user-sdk"
+version = "0.1.13"
+authors = [
+  { name="yyyyt", email="support@yyyyt.top" },
+]
+description = "云湖用户API的Python SDK"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.28.1",
+    "protobuf>=6.31.1",
+    "websockets>=15.0.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/yyyytawa-org/yh_user_sdk"
+Issues = "https://github.com/yyyytawa-org/yh_user_sdk/issues"
+
+[tool.hatch]
+project.root = "src"
+
+[tool.uv.workspace]
+members = [
+    ".",
+]
+
+[tool.uv.sources]
+yh-user-sdk = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "yh-user-sdk",
+]
