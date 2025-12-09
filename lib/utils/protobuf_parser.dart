@@ -590,3 +590,225 @@ Map<String, dynamic> parseMessageContent(Uint8List data) {
   return result;
 }
 
+/// 解析 Medal_info
+Map<String, dynamic>? parseMedalInfo(Uint8List data) {
+  final parser = ProtobufParser(data);
+  final result = <String, dynamic>{};
+
+  while (parser.hasMore) {
+    final tag = parser.readTag();
+    if (tag == null) break;
+
+    final (fieldNumber, wireType) = tag;
+
+    switch (fieldNumber) {
+      case 1: // id
+        result['id'] = parser.readVarint()?.toInt();
+        break;
+      case 2: // name
+        result['name'] = parser.readString();
+        break;
+      case 5: // sort
+        result['sort'] = parser.readVarint()?.toInt();
+        break;
+      default:
+        parser.skipField(wireType);
+    }
+  }
+
+  return result;
+}
+
+/// 解析 RemarkInfo
+Map<String, dynamic>? parseRemarkInfo(Uint8List data) {
+  final parser = ProtobufParser(data);
+  final result = <String, dynamic>{};
+
+  while (parser.hasMore) {
+    final tag = parser.readTag();
+    if (tag == null) break;
+
+    final (fieldNumber, wireType) = tag;
+
+    switch (fieldNumber) {
+      case 1: // remark_name
+        result['remark_name'] = parser.readString();
+        break;
+      case 2: // phone_number
+        result['phone_number'] = parser.readString();
+        break;
+      case 3: // extra_remark
+        result['extra_remark'] = parser.readString();
+        break;
+      default:
+        parser.skipField(wireType);
+    }
+  }
+
+  return result;
+}
+
+/// 解析 ProfileInfo
+Map<String, dynamic>? parseProfileInfo(Uint8List data) {
+  final parser = ProtobufParser(data);
+  final result = <String, dynamic>{};
+
+  while (parser.hasMore) {
+    final tag = parser.readTag();
+    if (tag == null) break;
+
+    final (fieldNumber, wireType) = tag;
+
+    switch (fieldNumber) {
+      case 1: // last_active_time
+        result['last_active_time'] = parser.readString();
+        break;
+      case 2: // introduction
+        result['introduction'] = parser.readString();
+        break;
+      case 3: // gender
+        result['gender'] = parser.readVarint()?.toInt();
+        break;
+      case 4: // birthday
+        result['birthday'] = parser.readVarint()?.toInt();
+        break;
+      case 5: // city
+        result['city'] = parser.readString();
+        break;
+      case 6: // district
+        result['district'] = parser.readString();
+        break;
+      case 7: // address
+        result['address'] = parser.readString();
+        break;
+      default:
+        parser.skipField(wireType);
+    }
+  }
+
+  return result;
+}
+
+/// 解析 get_user 响应
+Map<String, dynamic>? parseGetUser(Uint8List data) {
+  try {
+    final parser = ProtobufParser(data);
+    final result = <String, dynamic>{};
+    Status? status;
+    Map<String, dynamic>? userData;
+
+    while (parser.hasMore) {
+      final tag = parser.readTag();
+      if (tag == null) break;
+
+      final (fieldNumber, wireType) = tag;
+
+      switch (fieldNumber) {
+        case 1: // status
+          final statusData = parser.readLengthDelimited();
+          if (statusData != null) {
+            status = parseStatus(statusData);
+            result['status'] = status?.toMap();
+          }
+          break;
+        case 2: // data
+          final dataBytes = parser.readLengthDelimited();
+          if (dataBytes != null) {
+            userData = parseGetUserData(dataBytes);
+            result['data'] = userData;
+          }
+          break;
+        default:
+          parser.skipField(wireType);
+      }
+    }
+
+    if (status != null && userData != null) {
+      return result;
+    }
+    return null;
+  } catch (e) {
+    print('解析用户详情失败: $e');
+    return null;
+  }
+}
+
+/// 解析 get_user Data
+Map<String, dynamic> parseGetUserData(Uint8List data) {
+  final parser = ProtobufParser(data);
+  final result = <String, dynamic>{};
+  final medals = <Map<String, dynamic>>[];
+
+  while (parser.hasMore) {
+    final tag = parser.readTag();
+    if (tag == null) break;
+
+    final (fieldNumber, wireType) = tag;
+
+    switch (fieldNumber) {
+      case 1: // id
+        result['id'] = parser.readString();
+        break;
+      case 2: // name
+        result['name'] = parser.readString();
+        break;
+      case 3: // name_id
+        result['name_id'] = parser.readVarint()?.toInt();
+        break;
+      case 4: // avatar_url
+        result['avatar_url'] = parser.readString();
+        break;
+      case 5: // avatar_id
+        result['avatar_id'] = parser.readVarint()?.toInt();
+        break;
+      case 6: // medal (repeated)
+        final medalData = parser.readLengthDelimited();
+        if (medalData != null) {
+          final medal = parseMedalInfo(medalData);
+          if (medal != null) {
+            medals.add(medal);
+          }
+        }
+        break;
+      case 7: // register_time
+        result['register_time'] = parser.readString();
+        break;
+      case 10: // ban_time
+        result['ban_time'] = parser.readVarint()?.toInt();
+        break;
+      case 11: // online_day
+        result['online_day'] = parser.readVarint()?.toInt();
+        break;
+      case 12: // continuous_online_day
+        result['continuous_online_day'] = parser.readVarint()?.toInt();
+        break;
+      case 13: // is_vip
+        result['is_vip'] = parser.readVarint()?.toInt();
+        break;
+      case 14: // vip_expired_time
+        result['vip_expired_time'] = parser.readVarint()?.toInt();
+        break;
+      case 18: // remark_info
+        final remarkData = parser.readLengthDelimited();
+        if (remarkData != null) {
+          result['remark_info'] = parseRemarkInfo(remarkData);
+        }
+        break;
+      case 19: // profile_info
+        final profileData = parser.readLengthDelimited();
+        if (profileData != null) {
+          result['profile_info'] = parseProfileInfo(profileData);
+        }
+        break;
+      default:
+        parser.skipField(wireType);
+    }
+  }
+
+  if (medals.isNotEmpty) {
+    result['medal'] = medals;
+  }
+
+  return result;
+}
+

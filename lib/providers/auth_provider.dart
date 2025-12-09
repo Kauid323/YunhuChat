@@ -73,6 +73,60 @@ class AuthProvider with ChangeNotifier {
     return false;
   }
 
+  /// 手机号验证码登录
+  Future<bool> loginWithMobile({
+    required String mobile,
+    required String captcha,
+    required String deviceId,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      // 调用手机号登录API
+      final response = await ApiService.verificationLogin(
+        mobile: mobile,
+        captcha: captcha,
+        deviceId: deviceId,
+      );
+
+      if (response.isSuccess && response.token != null) {
+        // 保存Token
+        await StorageService.saveToken(response.token!);
+        await StorageService.saveDeviceId(deviceId);
+
+        // 获取用户信息
+        final userInfo = await ApiService.getUserInfo();
+        if (userInfo != null) {
+          _user = userInfo;
+          await StorageService.saveUserId(userInfo.id);
+          
+          // 连接WebSocket
+          _wsService.onMessageReceived = (data) {
+            // 处理WebSocket消息
+            print('收到WebSocket消息: ${data['cmd']}');
+          };
+          await _wsService.connect();
+          
+          _isLoading = false;
+          notifyListeners();
+          return true;
+        } else {
+          _errorMessage = '获取用户信息失败';
+        }
+      } else {
+        _errorMessage = response.msg;
+      }
+    } catch (e) {
+      _errorMessage = '登录失败: ${e.toString()}';
+    }
+
+    _isLoading = false;
+    notifyListeners();
+    return false;
+  }
+
   /// 退出登录
   Future<void> logout() async {
     _wsService.disconnect();

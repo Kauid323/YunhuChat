@@ -86,27 +86,80 @@ Uint8List encodeSendMessage({
   String? quoteMsgId,
   int? commandId,
 }) {
-  final encoder = ProtobufEncoder();
-  
-  // 编码 Content (send_message_send.Content)
-  final contentEncoder = ProtobufEncoder();
-  contentEncoder.writeString(1, text); // text
-  final contentBytes = contentEncoder.toBytes();
-  
-  // 编码 send_message_send
-  encoder.writeString(2, msgId); // msg_id
-  encoder.writeString(3, chatId); // chat_id
-  encoder.writeInt64(4, Int64(chatType)); // chat_type
-  encoder.writeMessage(5, contentBytes); // Content (data字段在proto中实际是Content)
-  encoder.writeInt64(6, Int64(contentType)); // content_type
-  if (commandId != null) {
-    encoder.writeInt64(7, Int64(commandId)); // command_id
+  try {
+    print('========== 编码发送消息 ==========');
+    print('输入参数: msgId=$msgId, chatId=$chatId, chatType=$chatType, text=$text, contentType=$contentType');
+    
+    final encoder = ProtobufEncoder();
+    print('创建 encoder 完成');
+    
+    // 编码 Content (send_message_send.Content)
+    print('开始编码 Content...');
+    final contentEncoder = ProtobufEncoder();
+    print('创建 contentEncoder 完成');
+    
+    print('准备写入 text (field 1): "$text"');
+    contentEncoder.writeString(1, text); // text
+    print('写入 text 完成');
+    
+    final contentBytes = contentEncoder.toBytes();
+    print('Content 编码完成，长度: ${contentBytes.length} 字节');
+    if (contentBytes.isNotEmpty) {
+      print('Content 前20字节: ${contentBytes.take(20).map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}');
+    }
+    
+    // 编码 send_message_send
+    print('开始编码 send_message_send...');
+    print('准备写入 msg_id (field 2): "$msgId"');
+    encoder.writeString(2, msgId); // msg_id
+    print('写入 msg_id 完成');
+    
+    print('准备写入 chat_id (field 3): "$chatId"');
+    encoder.writeString(3, chatId); // chat_id
+    print('写入 chat_id 完成');
+    
+    print('准备写入 chat_type (field 4): $chatType');
+    encoder.writeInt64(4, Int64(chatType)); // chat_type
+    print('写入 chat_type 完成');
+    
+    print('准备写入 content (field 5)，长度: ${contentBytes.length}');
+    encoder.writeMessage(5, contentBytes); // Content
+    print('写入 content 完成');
+    
+    print('准备写入 content_type (field 6): $contentType');
+    encoder.writeInt64(6, Int64(contentType)); // content_type
+    print('写入 content_type 完成');
+    
+    if (commandId != null) {
+      print('准备写入 command_id (field 7): $commandId');
+      encoder.writeInt64(7, Int64(commandId)); // command_id
+      print('写入 command_id 完成');
+    }
+    
+    if (quoteMsgId != null) {
+      print('准备写入 quote_msg_id (field 8): "$quoteMsgId"');
+      encoder.writeString(8, quoteMsgId); // quote_msg_id
+      print('写入 quote_msg_id 完成');
+    }
+    
+    print('准备获取编码结果...');
+    final result = encoder.toBytes();
+    print('编码完成，总长度: ${result.length} 字节');
+    if (result.isNotEmpty) {
+      print('编码结果前50字节: ${result.take(50).map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}');
+    }
+    print('========== 编码发送消息结束 ==========');
+    
+    return result;
+  } catch (e, stackTrace) {
+    print('========== 编码发送消息异常 ==========');
+    print('异常类型: ${e.runtimeType}');
+    print('异常信息: $e');
+    print('堆栈跟踪:');
+    print(stackTrace);
+    print('========== 编码发送消息异常结束 ==========');
+    rethrow;
   }
-  if (quoteMsgId != null) {
-    encoder.writeString(8, quoteMsgId); // quote_msg_id
-  }
-  
-  return encoder.toBytes();
 }
 
 /// 编码获取消息列表请求
@@ -125,6 +178,13 @@ Uint8List encodeListMessage({
   encoder.writeInt64(4, Int64(chatType)); // chat_type
   encoder.writeString(5, chatId); // chat_id
   
+  return encoder.toBytes();
+}
+
+/// 编码获取用户信息请求
+Uint8List encodeGetUser({required String userId}) {
+  final encoder = ProtobufEncoder();
+  encoder.writeString(2, userId); // id
   return encoder.toBytes();
 }
 

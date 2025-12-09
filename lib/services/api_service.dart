@@ -90,6 +90,123 @@ class ApiService {
     }
   }
 
+  /// 获取图片验证码
+  static Future<Map<String, dynamic>?> getCaptcha({
+    required String deviceId,
+  }) async {
+    try {
+      final url = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.userCaptcha}');
+      final body = {
+        'deviceId': deviceId,
+      };
+
+      final response = await http.post(
+        url,
+        headers: _getHeaders(includeToken: false),
+        body: jsonEncode(body),
+      ).timeout(ApiConfig.connectionTimeout);
+
+      final data = jsonDecode(response.body);
+      if (data['code'] == 1 && data['data'] != null) {
+        return data['data'] as Map<String, dynamic>;
+      }
+      return null;
+    } catch (e) {
+      print('获取验证码失败: $e');
+      return null;
+    }
+  }
+
+  /// 获取短信验证码
+  static Future<bool> getVerificationCode({
+    required String mobile,
+    required String code,
+    required String id,
+    String platform = 'android',
+  }) async {
+    try {
+      final url = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.getVerificationCode}');
+      final body = {
+        'mobile': mobile,
+        'code': code,
+        'id': id,
+        'platform': platform,
+      };
+
+      final response = await http.post(
+        url,
+        headers: _getHeaders(includeToken: false),
+        body: jsonEncode(body),
+      ).timeout(ApiConfig.connectionTimeout);
+
+      final data = jsonDecode(response.body);
+      return data['code'] == 1;
+    } catch (e) {
+      print('获取短信验证码失败: $e');
+      return false;
+    }
+  }
+
+  /// 手机号验证码登录
+  static Future<LoginResponse> verificationLogin({
+    required String mobile,
+    required String captcha,
+    required String deviceId,
+    String platform = 'android',
+  }) async {
+    try {
+      final url = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.userVerificationLogin}');
+      final body = {
+        'mobile': mobile,
+        'captcha': captcha,
+        'deviceId': deviceId,
+        'platform': platform,
+      };
+
+      final response = await http.post(
+        url,
+        headers: _getHeaders(includeToken: false),
+        body: jsonEncode(body),
+      ).timeout(ApiConfig.connectionTimeout);
+
+      final data = jsonDecode(response.body);
+      return LoginResponse.fromJson(data);
+    } catch (e) {
+      return LoginResponse(
+        code: -1,
+        msg: '登录失败: ${e.toString()}',
+      );
+    }
+  }
+
+  /// 获取用户详情（Protobuf格式）
+  static Future<Map<String, dynamic>?> getUserDetail(String userId) async {
+    try {
+      final url = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.getUser}');
+      final requestBody = encodeGetUser(userId: userId);
+      
+      final response = await http.post(
+        url,
+        headers: _getHeaders(isProtobuf: true),
+        body: requestBody,
+      ).timeout(ApiConfig.connectionTimeout);
+
+      if (response.statusCode == 200) {
+        final data = _parseResponse(response);
+        
+        // 如果是 Protobuf 格式（字节数组）
+        if (data is Uint8List) {
+          var parseGetUser2 = parseGetUser(data);
+          return parseGetUser2;
+        }
+      }
+      return null;
+    } catch (e) {
+      print('获取用户详情失败: $e');
+      return null;
+    }
+  }
+
   /// 获取用户信息（Protobuf格式）
   static Future<UserModel?> getUserInfo() async {
     try {
@@ -243,6 +360,10 @@ class ApiService {
     int? commandId,
   }) async {
     try {
+      print('========== 发送消息开始 ==========');
+      print('URL: ${ApiConfig.baseUrl}${ApiConfig.sendMessage}');
+      print('参数: chatId=$chatId, chatType=$chatType, msgId=$msgId, text=$text, contentType=$contentType');
+      
       final url = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.sendMessage}');
       
       // 使用 Protobuf 编码请求
@@ -255,18 +376,31 @@ class ApiService {
         quoteMsgId: quoteMsgId,
         commandId: commandId,
       );
+      
+      print('编码后的请求体长度: ${bodyBytes.length} 字节');
+      print('请求体前20字节: ${bodyBytes.take(20).map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}');
+
+      final headers = _getHeaders(isProtobuf: true);
+      print('请求头: $headers');
 
       final response = await http.post(
         url,
-        headers: _getHeaders(isProtobuf: true),
+        headers: headers,
         body: bodyBytes,
       ).timeout(ApiConfig.connectionTimeout);
 
+      print('响应状态码: ${response.statusCode}');
+      print('响应Content-Type: ${response.headers['content-type']}');
+      print('响应体长度: ${response.bodyBytes.length} 字节');
+      
       if (response.statusCode == 200) {
         // Protobuf 响应，解析状态
         final data = _parseResponse(response);
         
         if (data is Uint8List) {
+          print('响应是 Protobuf 格式，开始解析...');
+          print('响应体前20字节: ${data.take(20).map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}');
+          
           // 解析 Protobuf 响应
           final parser = ProtobufParser(data);
           Status? status;
@@ -276,10 +410,14 @@ class ApiService {
             if (tag == null) break;
             
             final (fieldNumber, wireType) = tag;
+            print('解析字段: fieldNumber=$fieldNumber, wireType=$wireType');
+            
             if (fieldNumber == 1) { // status
               final statusBytes = parser.readLengthDelimited();
               if (statusBytes != null) {
+                print('解析 status，长度: ${statusBytes.length}');
                 status = parseStatus(statusBytes);
+                print('Status: code=${status?.code}, msg=${status?.msg}');
                 break;
               }
             } else {
@@ -287,17 +425,39 @@ class ApiService {
             }
           }
           
-          return status?.code == 1;
+          final success = status?.code == 1;
+          print('发送消息结果: ${success ? "成功" : "失败"}');
+          if (!success) {
+            print('失败原因: code=${status?.code}, msg=${status?.msg}');
+          }
+          print('========== 发送消息结束 ==========');
+          return success;
         }
         
         // 兼容 JSON 格式
         if (data is Map<String, dynamic>) {
-          return data['code'] == 1;
+          print('响应是 JSON 格式: $data');
+          final success = data['code'] == 1;
+          print('发送消息结果: ${success ? "成功" : "失败"}');
+          print('========== 发送消息结束 ==========');
+          return success;
         }
+        
+        print('响应格式未知: ${data.runtimeType}');
+      } else {
+        print('HTTP 错误: statusCode=${response.statusCode}');
+        print('响应体: ${response.body}');
       }
+      
+      print('========== 发送消息结束 ==========');
       return false;
-    } catch (e) {
-      print('发送消息失败: $e');
+    } catch (e, stackTrace) {
+      print('========== 发送消息异常 ==========');
+      print('异常类型: ${e.runtimeType}');
+      print('异常信息: $e');
+      print('堆栈跟踪:');
+      print(stackTrace);
+      print('========== 发送消息异常结束 ==========');
       return false;
     }
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
 import 'screens/login_screen.dart';
@@ -23,25 +24,63 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
       ],
-      child: MaterialApp(
-        title: '云湖',
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.blue,
-            brightness: Brightness.light,
-          ),
-          useMaterial3: true,
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle(
+          // 状态栏样式
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.dark,
+          statusBarBrightness: Brightness.light,
+          // 导航栏样式（手势条背景）
+          systemNavigationBarColor: Colors.transparent,
+          systemNavigationBarIconBrightness: Brightness.dark,
+          systemNavigationBarDividerColor: Colors.transparent,
         ),
-        darkTheme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.blue,
-            brightness: Brightness.dark,
+        child: MaterialApp(
+          title: '云湖',
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: Colors.blue,
+              brightness: Brightness.light,
+            ),
+            useMaterial3: true,
           ),
-          useMaterial3: true,
+          darkTheme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: Colors.blue,
+              brightness: Brightness.dark,
+            ),
+            useMaterial3: true,
+          ),
+          themeMode: ThemeMode.system, // 跟随系统主题，启用莫奈取色
+          builder: (context, child) {
+            // 根据主题动态设置系统 UI 样式
+            final theme = Theme.of(context);
+            final brightness = theme.brightness;
+            // 使用与 NavigationBar 相同的背景色（Material 3 中 NavigationBar 使用 surface 颜色）
+            final navigationBarColor = theme.colorScheme.surface;
+            
+            return AnnotatedRegion<SystemUiOverlayStyle>(
+              value: SystemUiOverlayStyle(
+                statusBarColor: Colors.transparent,
+                statusBarIconBrightness: brightness == Brightness.dark
+                    ? Brightness.light
+                    : Brightness.dark,
+                statusBarBrightness: brightness == Brightness.dark
+                    ? Brightness.dark
+                    : Brightness.light,
+                // 使用与 NavigationBar 相同的颜色
+                systemNavigationBarColor: navigationBarColor,
+                systemNavigationBarIconBrightness: brightness == Brightness.dark
+                    ? Brightness.light
+                    : Brightness.dark,
+                systemNavigationBarDividerColor: Colors.transparent,
+              ),
+              child: child!,
+            );
+          },
+          home: const SplashScreen(),
         ),
-        themeMode: ThemeMode.system, // 跟随系统主题，启用莫奈取色
-        home: const SplashScreen(),
       ),
     );
   }

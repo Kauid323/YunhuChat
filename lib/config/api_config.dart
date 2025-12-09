@@ -11,12 +11,16 @@ class ApiConfig {
   
   // API端点
   static const String userEmailLogin = '$apiVersion/user/email-login';
+  static const String userCaptcha = '$apiVersion/user/captcha';
+  static const String userVerificationLogin = '$apiVersion/user/verification-login';
   static const String userInfo = '$apiVersion/user/info';
+  static const String getUser = '$apiVersion/user/get-user';
   static const String conversationList = '$apiVersion/conversation/list';
   static const String listMessage = '$apiVersion/msg/list-message';
   static const String sendMessage = '$apiVersion/msg/send-message';
   static const String groupInfo = '$apiVersion/group/info';
   static const String listMember = '$apiVersion/group/list-member';
+  static const String getVerificationCode = '$apiVersion/verification/get-verification-code';
   
   // 超时配置
   static const Duration connectionTimeout = Duration(seconds: 30);

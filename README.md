@@ -87,20 +87,6 @@ flutter build apk
 flutter build ios
 ```
 
-## API 说明
-
-本应用使用云湖官方 API：
-
-- **Base URL**: `https://chat-go.jwzhd.com`
-- **WebSocket URL**: `wss://chat-ws-go.jwzhd.com/ws`
-
-### 主要 API 端点
-
-- `POST /v1/user/email-login` - 邮箱登录
-- `GET /v1/user/info` - 获取用户信息
-- `POST /v1/conversation/list` - 获取会话列表
-- `POST /v1/msg/list-message` - 获取消息列表
-- `POST /v1/msg/send-message` - 发送消息
 
 ## Protobuf 支持
 
@@ -167,14 +153,6 @@ class ApiConfig {
 3. **发送消息**
    - 功能开发中...
 
-## 开发指南
-
-### 添加新功能
-
-1. 在 `lib/models/` 创建数据模型
-2. 在 `lib/services/api_service.dart` 添加 API 方法
-3. 在 `lib/providers/` 创建状态管理
-4. 在 `lib/screens/` 创建页面
 
 ### 调试
 
@@ -189,26 +167,10 @@ flutter clean
 flutter pub outdated
 ```
 
-## 常见问题
-
-### Q: 构建失败？
-A: 运行 `flutter clean` 然后 `flutter pub get`
-
-### Q: WebSocket 连接失败？
-A: 检查网络连接和 token 是否有效
-
-### Q: Protobuf 解析错误？
-A: 部分 API 需要特殊的 Protobuf 解析，如遇问题请查看日志
-
 ## 许可证
 
 本项目仅供学习交流使用。
 
-## 相关链接
-
-- [Flutter 官方文档](https://flutter.dev/docs)
-- [Protobuf 官方文档](https://protobuf.dev/)
-- [云湖 API 文档](./yhapi/)
 
 ## 贡献
 

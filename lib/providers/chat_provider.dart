@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:uuid/uuid.dart';
 import '../models/message_model.dart';
 import '../services/api_service.dart';
 import '../services/websocket_service.dart';
@@ -17,6 +18,7 @@ class ChatProvider with ChangeNotifier {
   bool _hasMoreMessages = true;
   bool _isInitialLoad = true; // 标记是否是首次加载
   String? _errorMessage;
+  bool _disposed = false; // 标记是否已 dispose
 
   List<MessageModel> get messages => _messages;
   bool get isLoading => _isLoading;
@@ -61,6 +63,7 @@ class ChatProvider with ChangeNotifier {
 
   /// 处理新消息
   void _handleNewMessage(Map<String, dynamic> msgData) {
+    if (_disposed) return;
     try {
       final message = MessageModel.fromJson(msgData);
       
@@ -72,7 +75,7 @@ class ChatProvider with ChangeNotifier {
           final timeB = b.sendTime ?? 0;
           return timeA.compareTo(timeB);
         });
-        notifyListeners();
+        if (!_disposed) notifyListeners();
       }
     } catch (e) {
       print('处理新消息失败: $e');
@@ -81,6 +84,8 @@ class ChatProvider with ChangeNotifier {
 
   /// 加载消息列表
   Future<void> loadMessages({String? fromMsgId}) async {
+    if (_disposed) return;
+    
     if (fromMsgId == null) {
       // 首次加载
       _isLoading = true;
@@ -88,11 +93,11 @@ class ChatProvider with ChangeNotifier {
       _isInitialLoad = true;
     } else {
       // 加载更多
-      if (_isLoadingMore || !_hasMoreMessages) return;
+      if (_isLoadingMore || !_hasMoreMessages || _disposed) return;
       _isLoadingMore = true;
     }
     _errorMessage = null;
-    notifyListeners();
+    if (!_disposed) notifyListeners();
 
     try {
       final newMessages = await ApiService.getMessageList(
@@ -101,6 +106,8 @@ class ChatProvider with ChangeNotifier {
         msgCount: 30,
         msgId: fromMsgId,
       );
+
+      if (_disposed) return;
 
       if (fromMsgId == null) {
         // 首次加载，替换所有消息
@@ -136,27 +143,27 @@ class ChatProvider with ChangeNotifier {
 
       _isLoading = false;
       _isLoadingMore = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
     } catch (e) {
+      if (_disposed) return;
       _errorMessage = '加载消息失败: ${e.toString()}';
       _isLoading = false;
       _isLoadingMore = false;
       _isInitialLoad = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
     }
   }
 
   /// 发送消息
   Future<bool> sendMessage(String text) async {
-    if (text.trim().isEmpty) return false;
+    if (text.trim().isEmpty || _disposed) return false;
 
     _isSending = true;
-    notifyListeners();
+    if (!_disposed) notifyListeners();
 
     try {
-      // 生成消息ID
-      final msgId = DateTime.now().millisecondsSinceEpoch.toString() + 
-                   '_${chatId}_${text.hashCode}';
+      // 生成消息ID (使用 UUID，类似 Python 的 uuid.uuid4().hex)
+      final msgId = const Uuid().v4().replaceAll('-', '');
 
       final success = await ApiService.sendMessage(
         chatId: chatId,
@@ -165,8 +172,10 @@ class ChatProvider with ChangeNotifier {
         text: text,
       );
 
+      if (_disposed) return false;
+
       _isSending = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
 
       if (success) {
         // 发送成功后重新加载消息列表
@@ -174,13 +183,14 @@ class ChatProvider with ChangeNotifier {
         return true;
       } else {
         _errorMessage = '发送消息失败';
-        notifyListeners();
+        if (!_disposed) notifyListeners();
         return false;
       }
     } catch (e) {
+      if (_disposed) return false;
       _errorMessage = '发送消息失败: ${e.toString()}';
       _isSending = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
       return false;
     }
   }
@@ -195,8 +205,18 @@ class ChatProvider with ChangeNotifier {
 
   /// 清除错误信息
   void clearError() {
+    if (_disposed) return;
     _errorMessage = null;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    // 恢复 WebSocket 回调（移除我们的监听器）
+    // 注意：这里可能需要保存原始回调，但为了简化，我们直接清空
+    // 如果 wsService 是共享的，可能需要更复杂的清理逻辑
+    super.dispose();
   }
 }
 

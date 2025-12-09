@@ -4,6 +4,7 @@ import '../providers/auth_provider.dart';
 import '../providers/chat_provider.dart';
 import '../models/message_model.dart';
 import '../utils/image_loader.dart';
+import 'user_detail_screen.dart';
 import 'package:intl/intl.dart';
 
 /// 聊天页面
@@ -29,62 +30,11 @@ class _ChatScreenState extends State<ChatScreen> {
   final FocusNode _focusNode = FocusNode();
 
   @override
-  void initState() {
-    super.initState();
-    // 监听滚动事件
-    _scrollController.addListener(_onScroll);
-  }
-
-  @override
   void dispose() {
-    _scrollController.removeListener(_onScroll);
     _textController.dispose();
     _scrollController.dispose();
     _focusNode.dispose();
     super.dispose();
-  }
-
-  /// 滚动监听，检测是否滚动到顶部
-  void _onScroll() {
-    if (!_scrollController.hasClients) return;
-    
-    // 当滚动到顶部附近时（距离顶部小于100像素），加载更多消息
-    if (_scrollController.position.pixels < 100) {
-      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-      if (chatProvider.hasMoreMessages && !chatProvider.isLoadingMore) {
-        chatProvider.loadMoreMessages();
-      }
-    }
-  }
-
-  void _scrollToBottom() {
-    if (_scrollController.hasClients) {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
-    }
-  }
-
-  Future<void> _handleSend() async {
-    final text = _textController.text.trim();
-    if (text.isEmpty) return;
-
-    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-    final success = await chatProvider.sendMessage(text);
-
-    if (success && mounted) {
-      _textController.clear();
-      _scrollToBottom();
-    } else if (mounted && chatProvider.errorMessage != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(chatProvider.errorMessage!),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
-    }
   }
 
   @override
@@ -109,7 +59,7 @@ class _ChatScreenState extends State<ChatScreen> {
 }
 
 /// 聊天内容（分离出来以便访问Provider）
-class _ChatContent extends StatelessWidget {
+class _ChatContent extends StatefulWidget {
   final String chatName;
   final TextEditingController textController;
   final ScrollController scrollController;
@@ -122,10 +72,41 @@ class _ChatContent extends StatelessWidget {
     required this.focusNode,
   });
 
+  @override
+  State<_ChatContent> createState() => _ChatContentState();
+}
+
+class _ChatContentState extends State<_ChatContent> {
+  bool _hasInitializedScroll = false; // 标记是否已经初始化滚动
+
+  @override
+  void initState() {
+    super.initState();
+    // 监听输入框焦点变化
+    widget.focusNode.addListener(_onFocusChange);
+  }
+
+  @override
+  void dispose() {
+    widget.focusNode.removeListener(_onFocusChange);
+    super.dispose();
+  }
+
+  void _onFocusChange() {
+    // 当输入框获得焦点时，延迟滚动到底部，等待键盘弹出
+    if (widget.focusNode.hasFocus) {
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (mounted && widget.focusNode.hasFocus) {
+          _scrollToBottom();
+        }
+      });
+    }
+  }
+
   void _scrollToBottom() {
-    if (scrollController.hasClients) {
-      scrollController.animateTo(
-        scrollController.position.maxScrollExtent,
+    if (widget.scrollController.hasClients) {
+      widget.scrollController.animateTo(
+        widget.scrollController.position.maxScrollExtent,
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOut,
       );
@@ -133,14 +114,14 @@ class _ChatContent extends StatelessWidget {
   }
 
   Future<void> _handleSend(BuildContext context) async {
-    final text = textController.text.trim();
+    final text = widget.textController.text.trim();
     if (text.isEmpty) return;
 
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
     final success = await chatProvider.sendMessage(text);
 
     if (success) {
-      textController.clear();
+      widget.textController.clear();
       _scrollToBottom();
     } else if (chatProvider.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -154,9 +135,13 @@ class _ChatContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 获取键盘高度
+    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+    
     return Scaffold(
+        resizeToAvoidBottomInset: true, // 确保键盘弹出时调整布局
         appBar: AppBar(
-          title: Text(chatName),
+          title: Text(widget.chatName),
         ),
         body: Column(
           children: [
@@ -179,13 +164,28 @@ class _ChatContent extends StatelessWidget {
                     );
                   }
 
-                  // 初始化时滚动到底部（仅在首次加载时）
-                  if (chatProvider.messages.isNotEmpty && !chatProvider.isLoading) {
+                  // 仅在首次加载完成时滚动到底部
+                  if (chatProvider.messages.isNotEmpty && 
+                      !chatProvider.isLoading && 
+                      !chatProvider.isInitialLoad &&
+                      !_hasInitializedScroll) {
                     WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (scrollController.hasClients) {
-                        scrollController.jumpTo(
-                          scrollController.position.maxScrollExtent,
+                      if (widget.scrollController.hasClients && mounted) {
+                        widget.scrollController.jumpTo(
+                          widget.scrollController.position.maxScrollExtent,
                         );
+                        setState(() {
+                          _hasInitializedScroll = true;
+                        });
+                      }
+                    });
+                  }
+
+                  // 当键盘弹出时，自动滚动到底部
+                  if (keyboardHeight > 0 && widget.focusNode.hasFocus) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (widget.scrollController.hasClients && mounted) {
+                        _scrollToBottom();
                       }
                     });
                   }
@@ -194,7 +194,7 @@ class _ChatContent extends StatelessWidget {
                     onNotification: (notification) {
                       // 当滚动到顶部时触发加载更多
                       if (notification is ScrollUpdateNotification) {
-                        final position = scrollController.position;
+                        final position = widget.scrollController.position;
                         // 当滚动到顶部附近时（距离顶部小于200像素），加载更多消息
                         if (position.pixels < 200 &&
                             position.pixels > 0 &&
@@ -207,7 +207,7 @@ class _ChatContent extends StatelessWidget {
                       return false;
                     },
                     child: ListView.builder(
-                      controller: scrollController,
+                      controller: widget.scrollController,
                       reverse: false,
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
                       itemCount: chatProvider.messages.length + (chatProvider.isLoadingMore ? 1 : 0),
@@ -234,12 +234,12 @@ class _ChatContent extends StatelessWidget {
               ),
             ),
             
-            // 输入框
-            _MessageInput(
-              controller: textController,
-              focusNode: focusNode,
-              onSend: () => _handleSend(context),
-            ),
+                    // 输入框
+                    _MessageInput(
+                      controller: widget.textController,
+                      focusNode: widget.focusNode,
+                      onSend: () => _handleSend(context),
+                    ),
           ],
         ),
     );
@@ -281,20 +281,31 @@ class _MessageBubble extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!isMyMessage) ...[
-            // 对方头像
-            CircleAvatar(
-              radius: 20,
-              backgroundColor: theme.colorScheme.primaryContainer,
-              backgroundImage: message.sender.avatarUrl != null
-                  ? ImageLoader.networkImageProvider(message.sender.avatarUrl!)
-                  : null,
-              child: message.sender.avatarUrl == null
-                  ? Icon(
-                      Icons.person,
-                      size: 20,
-                      color: theme.colorScheme.onPrimaryContainer,
-                    )
-                  : null,
+            // 对方头像（可点击）
+            GestureDetector(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => UserDetailScreen(
+                      userId: message.sender.chatId,
+                    ),
+                  ),
+                );
+              },
+              child: CircleAvatar(
+                radius: 20,
+                backgroundColor: theme.colorScheme.primaryContainer,
+                backgroundImage: message.sender.avatarUrl != null
+                    ? ImageLoader.networkImageProvider(message.sender.avatarUrl!)
+                    : null,
+                child: message.sender.avatarUrl == null
+                    ? Icon(
+                        Icons.person,
+                        size: 20,
+                        color: theme.colorScheme.onPrimaryContainer,
+                      )
+                    : null,
+              ),
             ),
             const SizedBox(width: 8),
           ],
