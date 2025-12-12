@@ -48345,7 +48345,7 @@ r=s.window.document.querySelector("meta[name=assetBase]")
 q=r==null?null:r.content
 p=q==null
 if(!p)s.window.console.warn("The `assetBase` meta tag is now deprecated.\nUse engineInitializer.initializeEngine(config) instead.\nSee: https://docs.flutter.dev/development/platform-integration/web/initialization")
-s=this.b=p?"":q}return A.lF(4,s+"assets/"+a,B.R,!1)}}
+s=this.b=p?"":q}return A.lF(4,s+"YunhuChat/web/assets/"+a,B.R,!1)}}
 A.AE.prototype={
 I(){return"BrowserEngine."+this.b}}
 A.mB.prototype={
