@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'conversation_list_screen.dart';
 import 'discover_screen.dart';
+import 'community_screen.dart';
 import 'profile_screen.dart';
 
 /// 主导航页面（带底部导航栏）
@@ -17,6 +18,7 @@ class _MainNavigationState extends State<MainNavigation> {
 
   final List<Widget> _pages = [
     const ConversationListScreen(),
+    const CommunityScreen(),
     const DiscoverScreen(),
     const ProfileScreen(),
   ];
@@ -59,6 +61,11 @@ class _MainNavigationState extends State<MainNavigation> {
             icon: Icon(Icons.chat_bubble_outline),
             selectedIcon: Icon(Icons.chat_bubble),
             label: '会话',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.forum_outlined),
+            selectedIcon: Icon(Icons.forum),
+            label: '社区',
           ),
           NavigationDestination(
             icon: Icon(Icons.explore_outlined),

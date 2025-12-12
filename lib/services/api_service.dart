@@ -5,6 +5,7 @@ import '../config/api_config.dart';
 import '../models/user_model.dart';
 import '../models/conversation_model.dart';
 import '../models/message_model.dart';
+import '../models/community_model.dart';
 import '../utils/protobuf_parser.dart';
 import '../utils/protobuf_encoder.dart';
 import 'storage_service.dart';
@@ -459,6 +460,239 @@ class ApiService {
       print(stackTrace);
       print('========== 发送消息异常结束 ==========');
       return false;
+    }
+  }
+
+
+  /// 获取社区文章列表
+  static Future<List<CommunityPost>> getCommunityPosts({
+    int page = 1,
+    int size = 20,
+    int baId = 41, // 默认云湖分区
+  }) async {
+    try {
+      final url = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.communityPostList}');
+      final body = {
+        'typ': 1,
+        'baId': baId,
+        'size': size,
+        'page': page,
+      };
+
+      final response = await http.post(
+        url,
+        headers: _getHeaders(),
+        body: jsonEncode(body),
+      ).timeout(ApiConfig.connectionTimeout);
+
+      final data = jsonDecode(response.body);
+      if (data['code'] == 1 && data['data'] != null) {
+        final posts = data['data']['posts'] as List?;
+        if (posts != null) {
+          return posts.map((e) => CommunityPost.fromJson(e)).toList();
+        }
+      }
+      return [];
+    } catch (e) {
+      print('获取文章列表失败: $e');
+      return [];
+    }
+  }
+
+  /// 获取关注的分区列表
+  static Future<List<CommunityPartition>> getCommunityPartitions({
+    int page = 1,
+    int size = 20,
+    int type = 2,
+  }) async {
+    try {
+      final url = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.communityPartitionList}');
+      final body = {
+        'typ': type,
+        'size': size,
+        'page': page,
+      };
+
+      final response = await http.post(
+        url,
+        headers: _getHeaders(),
+        body: jsonEncode(body),
+      ).timeout(ApiConfig.connectionTimeout);
+
+      final data = jsonDecode(response.body);
+      if (data['code'] == 1 && data['data'] != null) {
+        final bas = data['data']['ba'] as List?;
+        if (bas != null) {
+          return bas.map((e) => CommunityPartition.fromJson(e)).toList();
+        }
+      }
+      return [];
+    } catch (e) {
+      print('获取分区列表失败: $e');
+      return [];
+    }
+  }
+
+  /// 发布文章
+  static Future<bool> createPost({
+    required int baId,
+    required String title,
+    required String content,
+    int contentType = 1, // 1-文本，2-markdown
+    String groupId = '',
+  }) async {
+    try {
+      final url = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.communityPostCreate}');
+      final body = {
+        'baId': baId,
+        'title': title,
+        'content': content,
+        'contentType': contentType,
+        'groupId': groupId,
+      };
+
+      final response = await http.post(
+        url,
+        headers: _getHeaders(),
+        body: jsonEncode(body),
+      ).timeout(ApiConfig.connectionTimeout);
+
+      final data = jsonDecode(response.body);
+      return data['code'] == 1;
+    } catch (e) {
+      print('发布文章失败: $e');
+      return false;
+    }
+  }
+
+  /// 获取文章详情
+  static Future<CommunityPostDetailData?> getPostDetail({
+    required int postId,
+  }) async {
+    try {
+      final url = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.communityPostDetail}');
+      final body = {'id': postId};
+
+      final response = await http.post(
+        url,
+        headers: _getHeaders(),
+        body: jsonEncode(body),
+      ).timeout(ApiConfig.connectionTimeout);
+
+      final data = jsonDecode(response.body);
+      if (data['code'] == 1 && data['data'] != null) {
+        return CommunityPostDetailData.fromJson(data['data']);
+      }
+      return null;
+    } catch (e) {
+      print('获取文章详情失败: $e');
+      return null;
+    }
+  }
+
+  /// 发送评论
+  static Future<bool> sendComment({
+    required int postId,
+    required String content,
+    int commentId = 0, // 0表示评论文章
+  }) async {
+    try {
+      final url = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.communityComment}');
+      final body = {
+        'postId': postId,
+        'commentId': commentId,
+        'content': content,
+      };
+
+      final response = await http.post(
+        url,
+        headers: _getHeaders(),
+        body: jsonEncode(body),
+      ).timeout(ApiConfig.connectionTimeout);
+
+      final data = jsonDecode(response.body);
+      return data['code'] == 1;
+    } catch (e) {
+      print('发送评论失败: $e');
+      return false;
+    }
+  }
+
+  /// 点赞/取消点赞
+  static Future<bool> likePost({
+    required int postId,
+  }) async {
+    try {
+      final url = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.communityPostLike}');
+      final body = {'id': postId};
+
+      final response = await http.post(
+        url,
+        headers: _getHeaders(),
+        body: jsonEncode(body),
+      ).timeout(ApiConfig.connectionTimeout);
+
+      final data = jsonDecode(response.body);
+      return data['code'] == 1;
+    } catch (e) {
+      print('点赞操作失败: $e');
+      return false;
+    }
+  }
+
+  /// 收藏/取消收藏
+  static Future<bool> collectPost({
+    required int postId,
+  }) async {
+    try {
+      final url = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.communityPostCollect}');
+      final body = {'id': postId};
+
+      final response = await http.post(
+        url,
+        headers: _getHeaders(),
+        body: jsonEncode(body),
+      ).timeout(ApiConfig.connectionTimeout);
+
+      final data = jsonDecode(response.body);
+      return data['code'] == 1;
+    } catch (e) {
+      print('收藏操作失败: $e');
+      return false;
+    }
+  }
+
+  /// 获取评论列表
+  static Future<List<CommunityComment>> getComments({
+    required int postId,
+    int page = 1,
+    int size = 20,
+  }) async {
+    try {
+      final url = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.communityCommentList}');
+      final body = {
+        'postId': postId,
+        'size': size,
+        'page': page,
+      };
+
+      final response = await http.post(
+        url,
+        headers: _getHeaders(),
+        body: jsonEncode(body),
+      ).timeout(ApiConfig.connectionTimeout);
+
+      final data = jsonDecode(response.body);
+      if (data['code'] == 1 && data['data'] != null) {
+        final comments = data['data']['comments'] as List?;
+        if (comments != null) {
+          return comments.map((e) => CommunityComment.fromJson(e)).toList();
+        }
+      }
+      return [];
+    } catch (e) {
+      print('获取评论列表失败: $e');
+      return [];
     }
   }
 }

@@ -777,7 +777,7 @@ POST /v1/community/posts/post-detail
       "content": "文章内容", // 文章内容
       "delTime": 0, // 删除时间(戳)
       "createTime": 1757755754, // 文章发送时间戳
-      "updateTime": 0, // 文章更新时间戳
+      "updateTime": 1757755754, // 文章更新时间戳
       "editTime": 1757755828, // 文章上次编辑时间戳
       "lastActive": 1757755828, // 文章上次活跃(编辑)时间戳
       "likeNum": 0, // 文章点赞数量

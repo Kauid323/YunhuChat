@@ -79,97 +79,41 @@ class MyApp extends StatelessWidget {
               child: child!,
             );
           },
-          home: const SplashScreen(),
+          // 如果已登录，直接进入主界面，否则进入登录页
+          home: StorageService.isLoggedIn() ? const MainEntry() : const LoginScreen(),
         ),
       ),
     );
   }
 }
 
-/// 启动页，检查登录状态
-class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+/// 主入口封装，用于处理自动登录逻辑
+class MainEntry extends StatefulWidget {
+  const MainEntry({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  State<MainEntry> createState() => _MainEntryState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _MainEntryState extends State<MainEntry> {
   @override
   void initState() {
     super.initState();
-    _checkLoginStatus();
+    // 启动时在后台尝试更新用户信息和连接 WebSocket
+    // 使用 addPostFrameCallback 避免在 build 过程中调用 notifyListeners
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _autoLogin();
+    });
   }
 
-  Future<void> _checkLoginStatus() async {
-    // 延迟一下显示启动画面
-    await Future.delayed(const Duration(seconds: 1));
-    
-    if (!mounted) return;
-    
+  Future<void> _autoLogin() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final isLoggedIn = await authProvider.autoLogin();
-    
-    if (!mounted) return;
-    
-    // 根据登录状态跳转
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (context) => isLoggedIn 
-            ? const MainNavigation() 
-            : const LoginScreen(),
-      ),
-    );
+    // 这里 autoLogin 会更新 User 信息
+    await authProvider.autoLogin();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Theme.of(context).colorScheme.primary,
-              Theme.of(context).colorScheme.secondary,
-            ],
-          ),
-        ),
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.cloud,
-                size: 100,
-                color: Theme.of(context).colorScheme.onPrimary,
-              ),
-              const SizedBox(height: 24),
-              Text(
-                '云湖',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.onPrimary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '连接你我，沟通无限',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Theme.of(context).colorScheme.onPrimary.withOpacity(0.8),
-                ),
-              ),
-              const SizedBox(height: 48),
-              CircularProgressIndicator(
-                color: Theme.of(context).colorScheme.onPrimary,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    return const MainNavigation();
   }
 }

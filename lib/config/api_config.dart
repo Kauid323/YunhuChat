@@ -22,6 +22,16 @@ class ApiConfig {
   static const String listMember = '$apiVersion/group/list-member';
   static const String getVerificationCode = '$apiVersion/verification/get-verification-code';
   
+  // 社区API端点
+  static const String communityPostList = '$apiVersion/community/posts/post-list';
+  static const String communityPartitionList = '$apiVersion/community/ba/following-ba-list';
+  static const String communityPostCreate = '$apiVersion/community/posts/create';
+  static const String communityPostDetail = '$apiVersion/community/posts/post-detail';
+  static const String communityComment = '$apiVersion/community/comment/comment';
+  static const String communityPostLike = '$apiVersion/community/posts/post-like';
+  static const String communityPostCollect = '$apiVersion/community/posts/post-collect';
+  static const String communityCommentList = '$apiVersion/community/comment/comment-list';
+  
   // 超时配置
   static const Duration connectionTimeout = Duration(seconds: 30);
   static const Duration receiveTimeout = Duration(seconds: 30);
