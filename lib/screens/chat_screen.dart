@@ -6,6 +6,9 @@ import '../models/message_model.dart';
 import '../utils/image_loader.dart';
 import 'user_detail_screen.dart';
 import 'package:intl/intl.dart';
+import 'package:markdown_widget/markdown_widget.dart';
+import '../utils/latex_config.dart';
+import '../utils/image_preview_util.dart';
 
 /// 聊天页面
 class ChatScreen extends StatefulWidget {
@@ -402,6 +405,19 @@ class _MessageBubble extends StatelessWidget {
   }
 
   Widget _buildMessageContent(BuildContext context, MessageModel message) {
+    // 优先处理 Markdown，防止 switch case 匹配问题
+    if (message.contentType == 3) {
+      return MarkdownWidget(
+        data: message.content.text ?? '',
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        markdownGenerator: MarkdownGenerator(
+          inlineSyntaxList: [LatexSyntax()],
+          generators: [latexGenerator],
+        ),
+      );
+    }
+
     switch (message.contentType) {
       case 1: // 文本
         return Text(
@@ -414,13 +430,23 @@ class _MessageBubble extends StatelessWidget {
         );
       case 2: // 图片
         return message.content.imageUrl != null
-            ? ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: ImageLoader.networkImage(
-                  url: message.content.imageUrl!,
-                  width: 200,
-                  height: 200,
-                  fit: BoxFit.cover,
+            ? GestureDetector(
+                onTap: () {
+                  // 点击图片时显示预览
+                  ImagePreviewUtil.showImagePreview(
+                    context,
+                    imageUrl: message.content.imageUrl!,
+                    title: '图片消息',
+                  );
+                },
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: ImageLoader.networkImage(
+                    url: message.content.imageUrl!,
+                    width: 200,
+                    height: 200,
+                    fit: BoxFit.cover,
+                  ),
                 ),
               )
             : const Text('[图片]');

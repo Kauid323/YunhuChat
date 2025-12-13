@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../utils/image_loader.dart';
 import 'login_screen.dart';
+import 'about_screen.dart';
 
 /// 个人资料页面
 class ProfileScreen extends StatelessWidget {
@@ -154,7 +155,11 @@ class ProfileScreen extends StatelessWidget {
                 title: const Text('关于'),
                 trailing: Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.onSurfaceVariant),
                 onTap: () {
-                  // TODO: 实现关于页面
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const AboutScreen(),
+                    ),
+                  );
                 },
               ),
               const Divider(),

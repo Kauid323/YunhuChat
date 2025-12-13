@@ -77,6 +77,9 @@ class CommunityPartition {
   final String avatar;
   final int memberNum;
   final int postNum;
+  final int groupNum;
+  final String createTimeText;
+  final bool isFollowed;
 
   CommunityPartition({
     required this.id,
@@ -84,6 +87,9 @@ class CommunityPartition {
     required this.avatar,
     required this.memberNum,
     required this.postNum,
+    this.groupNum = 0,
+    this.createTimeText = '',
+    this.isFollowed = false,
   });
 
   factory CommunityPartition.fromJson(Map<String, dynamic> json) {
@@ -93,6 +99,9 @@ class CommunityPartition {
       avatar: json['avatar'] ?? '',
       memberNum: json['memberNum'] ?? 0,
       postNum: json['postNum'] ?? 0,
+      groupNum: json['groupNum'] ?? 0,
+      createTimeText: json['createTimeText'] ?? '',
+      isFollowed: (json['isFollowed'].toString() == '1'),
     );
   }
 }
@@ -125,6 +134,38 @@ class CommunityComment {
       senderNickname: json['senderNickname'] ?? '',
       senderAvatar: json['senderAvatar'] ?? '',
       createTimeText: json['createTimeText'] ?? '',
+    );
+  }
+}
+
+class CommunityGroup {
+  final int id;
+  final String groupId;
+  final String name;
+  final String introduction;
+  final String avatarUrl;
+  final int headcount;
+  final String category;
+
+  CommunityGroup({
+    required this.id,
+    required this.groupId,
+    required this.name,
+    required this.introduction,
+    required this.avatarUrl,
+    required this.headcount,
+    required this.category,
+  });
+
+  factory CommunityGroup.fromJson(Map<String, dynamic> json) {
+    return CommunityGroup(
+      id: json['id'] ?? 0,
+      groupId: json['groupId']?.toString() ?? '',
+      name: json['name'] ?? '',
+      introduction: json['introduction'] ?? '',
+      avatarUrl: json['avatarUrl'] ?? '',
+      headcount: json['headcount'] ?? 0,
+      category: json['category'] ?? '',
     );
   }
 }

@@ -197,7 +197,7 @@ class ApiService {
         
         // 如果是 Protobuf 格式（字节数组）
         if (data is Uint8List) {
-          var parseGetUser2 = parseGetUser(data);
+          late Map<String, dynamic>? parseGetUser2 = parseGetUser(data);
           return parseGetUser2;
         }
       }
@@ -693,6 +693,144 @@ class ApiService {
     } catch (e) {
       print('获取评论列表失败: $e');
       return [];
+    }
+  }
+
+  /// 获取我的文章列表
+  static Future<List<CommunityPost>> getMyPosts({
+    int page = 1,
+    int size = 20,
+  }) async {
+    try {
+      final url = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.communityMyPostList}');
+      final body = {
+        'size': size,
+        'page': page,
+      };
+
+      final response = await http.post(
+        url,
+        headers: _getHeaders(),
+        body: jsonEncode(body),
+      ).timeout(ApiConfig.connectionTimeout);
+
+      final data = jsonDecode(response.body);
+      if (data['code'] == 1 && data['data'] != null) {
+        final posts = data['data']['posts'] as List?;
+        if (posts != null) {
+          return posts.map((e) => CommunityPost.fromJson(e)).toList();
+        }
+      }
+      return [];
+    } catch (e) {
+      print('获取我的文章列表失败: $e');
+      return [];
+    }
+  }
+
+  /// 获取分区详情
+  static Future<CommunityPartition?> getPartitionInfo({
+    required int baId,
+  }) async {
+    try {
+      final url = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.communityPartitionInfo}');
+      final body = {'id': baId};
+
+      final response = await http.post(
+        url,
+        headers: _getHeaders(),
+        body: jsonEncode(body),
+      ).timeout(ApiConfig.connectionTimeout);
+
+      final data = jsonDecode(response.body);
+      if (data['code'] == 1 && data['data'] != null && data['data']['ba'] != null) {
+        return CommunityPartition.fromJson(data['data']['ba']);
+      }
+      return null;
+    } catch (e) {
+      print('获取分区详情失败: $e');
+      return null;
+    }
+  }
+
+  /// 获取分区下的群聊列表
+  static Future<List<CommunityGroup>> getPartitionGroups({
+    required int baId,
+    int page = 1,
+    int size = 20,
+  }) async {
+    try {
+      final url = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.communityPartitionGroupList}');
+      final body = {
+        'baId': baId,
+        'size': size,
+        'page': page,
+      };
+
+      final response = await http.post(
+        url,
+        headers: _getHeaders(),
+        body: jsonEncode(body),
+      ).timeout(ApiConfig.connectionTimeout);
+
+      final data = jsonDecode(response.body);
+      if (data['code'] == 1 && data['data'] != null) {
+        final groups = data['data']['groups'] as List?;
+        if (groups != null) {
+          return groups.map((e) => CommunityGroup.fromJson(e)).toList();
+        }
+      }
+      return [];
+    } catch (e) {
+      print('获取分区群聊列表失败: $e');
+      return [];
+    }
+  }
+
+  /// 关注分区
+  static Future<bool> followPartition({
+    required int baId,
+  }) async {
+    try {
+      final url = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.communityFollowPartition}');
+      final body = {
+        'baId': baId,
+        'followSource': 2,
+      };
+
+      final response = await http.post(
+        url,
+        headers: _getHeaders(),
+        body: jsonEncode(body),
+      ).timeout(ApiConfig.connectionTimeout);
+
+      final data = jsonDecode(response.body);
+      return data['code'] == 1;
+    } catch (e) {
+      print('关注分区失败: $e');
+      return false;
+    }
+  }
+
+  /// 取消关注分区
+  static Future<bool> unfollowPartition({
+    required int baId,
+  }) async {
+    try {
+      final url = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.communityUnfollowPartition}');
+      final body = {'baId': baId};
+
+      final response = await http.post(
+        url,
+        headers: _getHeaders(),
+        body: jsonEncode(body),
+      ).timeout(ApiConfig.connectionTimeout);
+
+      final data = jsonDecode(response.body);
+      return data['code'] == 1;
+    } catch (e) {
+      print('取消关注分区失败: $e');
+      return false;
     }
   }
 }

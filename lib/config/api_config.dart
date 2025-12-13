@@ -30,7 +30,12 @@ class ApiConfig {
   static const String communityComment = '$apiVersion/community/comment/comment';
   static const String communityPostLike = '$apiVersion/community/posts/post-like';
   static const String communityPostCollect = '$apiVersion/community/posts/post-collect';
+  static const String communityMyPostList = '$apiVersion/community/posts/my-post-list';
   static const String communityCommentList = '$apiVersion/community/comment/comment-list';
+  static const String communityPartitionInfo = '$apiVersion/community/ba/info';
+  static const String communityPartitionGroupList = '$apiVersion/community/ba/group-list';
+  static const String communityFollowPartition = '$apiVersion/community/ba/user-follow-ba';
+  static const String communityUnfollowPartition = '$apiVersion/community/ba/user-unfollow-ba';
   
   // 超时配置
   static const Duration connectionTimeout = Duration(seconds: 30);

@@ -4,6 +4,9 @@ import '../services/api_service.dart';
 import '../utils/image_loader.dart';
 import 'create_post_screen.dart';
 import 'post_detail_screen.dart';
+import '../widgets/community_post_item.dart';
+import 'my_post_list_screen.dart';
+import 'partition_info_screen.dart';
 
 class CommunityScreen extends StatefulWidget {
   const CommunityScreen({super.key});
@@ -66,10 +69,10 @@ class _CommunityScreenState extends State<CommunityScreen> {
         _isLoading = false;
       });
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
       if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('加载失败: $e')),
         );
@@ -83,6 +86,17 @@ class _CommunityScreenState extends State<CommunityScreen> {
       appBar: AppBar(
         title: const Text('社区'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.info_outline),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => PartitionInfoScreen(baId: _baId),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.list),
             onPressed: _showPartitionFilterSheet,
@@ -140,119 +154,10 @@ class _CommunityScreenState extends State<CommunityScreen> {
                   }
 
                   final post = _posts[index];
-                  return InkWell(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => PostDetailScreen(
-                            postId: post.id,
-                            previewPost: post,
-                          ),
-                        ),
-                      );
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 20,
-                                backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                                backgroundImage: post.senderAvatar.isNotEmpty
-                                    ? ImageLoader.networkImageProvider(post.senderAvatar)
-                                    : null,
-                                child: post.senderAvatar.isEmpty
-                                    ? const Icon(Icons.person)
-                                    : null,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      post.senderNickname,
-                                      style: Theme.of(context).textTheme.titleMedium,
-                                    ),
-                                    Text(
-                                      post.createTimeText,
-                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            post.title,
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          if (post.content.isNotEmpty) ...[
-                            const SizedBox(height: 8),
-                            Text(
-                              post.content,
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                          ],
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              _buildActionIcon(
-                                context,
-                                Icons.thumb_up_outlined,
-                                post.likeNum.toString(),
-                              ),
-                              const SizedBox(width: 24),
-                              _buildActionIcon(
-                                context,
-                                Icons.chat_bubble_outline,
-                                post.commentNum.toString(),
-                              ),
-                              const SizedBox(width: 24),
-                              _buildActionIcon(
-                                context,
-                                Icons.star_outline,
-                                post.collectNum.toString(),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
+                  return CommunityPostItem(post: post);
                 },
               ),
       ),
-    );
-  }
-
-  Widget _buildActionIcon(BuildContext context, IconData icon, String label) {
-    return Row(
-      children: [
-        Icon(
-          icon,
-          size: 18,
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-        ),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ],
     );
   }
 
@@ -416,11 +321,45 @@ class _PartitionListSheetState extends State<_PartitionListSheet> {
             children: [
               Padding(
                 padding: const EdgeInsets.all(16.0),
-                child: Text(
-                  '选择分区',
-                  style: Theme.of(context).textTheme.titleLarge,
+                child: Row(
+                  children: [
+                    Text(
+                      widget.type == 3 ? '我的' : '选择分区',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ],
                 ),
               ),
+               if (widget.type == 3) // My partition specific menu
+                 ListTile(
+                    leading: const Icon(Icons.article_outlined),
+                    title: const Text('我的文章'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const MyPostListScreen(),
+                        ),
+                      );
+                    },
+                 ),
+               if (widget.type == 3) const Divider(height: 1),
+
+               // Existing List
+               Padding(
+                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                 child: Row(
+                   children: [
+                     Text(
+                       widget.type == 3 ? '我创建的分区' : '分区列表',
+                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                         color: Theme.of(context).colorScheme.primary,
+                       ),
+                     ),
+                   ],
+                 ),
+               ),
               Expanded(
                 child: _partitions.isEmpty && !_isLoading
                     ? const Center(child: Text('暂无分区'))
@@ -453,6 +392,7 @@ class _PartitionListSheetState extends State<_PartitionListSheet> {
                         },
                       ),
               ),
+
             ],
           ),
         );

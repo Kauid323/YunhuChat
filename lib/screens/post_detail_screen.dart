@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/community_model.dart';
 import '../services/api_service.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:markdown_widget/markdown_widget.dart';
 import '../utils/image_loader.dart';
+import '../utils/latex_config.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final int postId;
@@ -280,13 +281,14 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   
                   // Content
                   if (post.contentType == 2) // Markdown
-                    MarkdownBody(
+                    MarkdownWidget(
                       data: post.content,
-                      selectable: true,
-                      onTapLink: (text, href, title) {
-                         // Open link logic here if needed
-                      },
-                      styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)),
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      markdownGenerator: MarkdownGenerator(
+                        inlineSyntaxList: [LatexSyntax()],
+                        generators: [latexGenerator],
+                      ),
                     )
                   else
                     SelectableText(
