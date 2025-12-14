@@ -59,5 +59,35 @@ class ConversationModel {
   }
 
   bool get hasUnread => (unreadMessage ?? 0) > 0;
+
+  ConversationModel copyWith({
+    String? chatId,
+    int? chatType,
+    String? name,
+    String? chatContent,
+    int? timestampMs,
+    int? unreadMessage,
+    int? at,
+    int? avatarId,
+    String? avatarUrl,
+    int? doNotDisturb,
+    int? timestamp,
+    int? certificationLevel,
+  }) {
+    return ConversationModel(
+      chatId: chatId ?? this.chatId,
+      chatType: chatType ?? this.chatType,
+      name: name ?? this.name,
+      chatContent: chatContent ?? this.chatContent,
+      timestampMs: timestampMs ?? this.timestampMs,
+      unreadMessage: unreadMessage ?? this.unreadMessage,
+      at: at ?? this.at,
+      avatarId: avatarId ?? this.avatarId,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      doNotDisturb: doNotDisturb ?? this.doNotDisturb,
+      timestamp: timestamp ?? this.timestamp,
+      certificationLevel: certificationLevel ?? this.certificationLevel,
+    );
+  }
 }
 

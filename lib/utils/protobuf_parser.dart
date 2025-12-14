@@ -26,8 +26,16 @@ class ProtobufParser {
       }
       
       shift += 7;
-      if (shift > 63) {
-        throw Exception('Varint 太长');
+      // 增加最大长度限制，防止无限循环
+      if (shift >= 64) {
+        // 跳过剩余的varint字节
+        while (_position < _data.length && (_data[_position] & 0x80) != 0) {
+          _position++;
+        }
+        if (_position < _data.length) {
+          _position++; // 跳过最后一个字节
+        }
+        return Int64.ZERO; // 返回默认值而不是抛出异常
       }
     }
     
@@ -70,7 +78,6 @@ class ProtobufParser {
       try {
         return String.fromCharCodes(bytes);
       } catch (e2) {
-        print('字符串解码失败: $e2');
         return null;
       }
     }
@@ -117,71 +124,42 @@ class ProtobufParser {
 
   /// 跳过字段
   void skipField(int wireType) {
-    switch (wireType) {
-      case 0: // varint
-        readVarint();
-        break;
-      case 1: // fixed64
-        _position += 8;
-        break;
-      case 2: // length-delimited
-        readLengthDelimited();
-        break;
-      case 5: // fixed32
-        _position += 4;
-        break;
-      default:
-        break;
+    try {
+      switch (wireType) {
+        case 0: // varint
+          readVarint();
+          break;
+        case 1: // fixed64
+          if (_position + 8 <= _data.length) {
+            _position += 8;
+          } else {
+            _position = _data.length;
+          }
+          break;
+        case 2: // length-delimited
+          readLengthDelimited();
+          break;
+        case 5: // fixed32
+          if (_position + 4 <= _data.length) {
+            _position += 4;
+          } else {
+            _position = _data.length;
+          }
+          break;
+        default:
+          // 未知的wire type，跳过到数据末尾
+          _position = _data.length;
+          break;
+      }
+    } catch (e) {
+      // 如果跳过字段时出错，直接跳到数据末尾
+      _position = _data.length;
     }
   }
 
   bool get hasMore => _position < _data.length;
   int get position => _position;
   void setPosition(int pos) => _position = pos;
-}
-
-/// 解析用户信息 Protobuf
-Map<String, dynamic>? parseUserInfo(Uint8List data) {
-  try {
-    final parser = ProtobufParser(data);
-    final result = <String, dynamic>{};
-    Status? status;
-    Map<String, dynamic>? userData;
-
-    while (parser.hasMore) {
-      final tag = parser.readTag();
-      if (tag == null) break;
-
-      final (fieldNumber, wireType) = tag;
-
-      switch (fieldNumber) {
-        case 1: // status
-          final statusData = parser.readLengthDelimited();
-          if (statusData != null) {
-            status = parseStatus(statusData);
-            result['status'] = status?.toMap();
-          }
-          break;
-        case 2: // data
-          final dataBytes = parser.readLengthDelimited();
-          if (dataBytes != null) {
-            userData = parseUserInfoData(dataBytes);
-            result['data'] = userData;
-          }
-          break;
-        default:
-          parser.skipField(wireType);
-      }
-    }
-
-    if (status != null && userData != null) {
-      return result;
-    }
-    return null;
-  } catch (e) {
-    print('解析用户信息失败: $e');
-    return null;
-  }
 }
 
 /// 解析 Status
@@ -231,6 +209,50 @@ Status? parseStatus(Uint8List data) {
   return Status(number: number, code: code, msg: msg);
 }
 
+/// 解析用户信息 Protobuf
+Map<String, dynamic>? parseUserInfo(Uint8List data) {
+  try {
+    final parser = ProtobufParser(data);
+    final result = <String, dynamic>{};
+    Status? status;
+    Map<String, dynamic>? userData;
+
+    while (parser.hasMore) {
+      final tag = parser.readTag();
+      if (tag == null) break;
+
+      final (fieldNumber, wireType) = tag;
+
+      switch (fieldNumber) {
+        case 1: // status
+          final statusData = parser.readLengthDelimited();
+          if (statusData != null) {
+            status = parseStatus(statusData);
+            result['status'] = status?.toMap();
+          }
+          break;
+        case 2: // data
+          final dataBytes = parser.readLengthDelimited();
+          if (dataBytes != null) {
+            userData = parseUserInfoData(dataBytes);
+            result['data'] = userData;
+          }
+          break;
+        default:
+          parser.skipField(wireType);
+      }
+    }
+
+    if (status != null && userData != null) {
+      return result;
+    }
+    return null;
+  } catch (e) {
+    print('解析用户信息失败: $e');
+    return null;
+  }
+}
+
 /// 解析用户信息数据
 Map<String, dynamic> parseUserInfoData(Uint8List data) {
   final parser = ProtobufParser(data);
@@ -249,12 +271,7 @@ Map<String, dynamic> parseUserInfoData(Uint8List data) {
         break;
       case 2: // name
         final name = parser.readString();
-        if (name != null) {
-          result['name'] = name;
-          print('解析到名称: $name (长度: ${name.length})');
-        } else {
-          print('名称字段为空');
-        }
+        if (name != null) result['name'] = name;
         break;
       case 4: // avatar_url
         final avatarUrl = parser.readString();
@@ -454,7 +471,7 @@ Map<String, dynamic>? parseMessageList(Uint8List data) {
   }
 }
 
-/// 解析单个消息数据（简化版，只解析主要字段）
+/// 解析单个消息数据
 Map<String, dynamic> parseMessageData(Uint8List data) {
   final parser = ProtobufParser(data);
   final result = <String, dynamic>{};
@@ -812,3 +829,124 @@ Map<String, dynamic> parseGetUserData(Uint8List data) {
   return result;
 }
 
+/// 解析通讯录列表
+Map<String, dynamic>? parseAddressBookList(Uint8List data) {
+  try {
+    final parser = ProtobufParser(data);
+    final result = <String, dynamic>{};
+    Status? status;
+    List<Map<String, dynamic>>? groupList;
+
+    while (parser.hasMore) {
+      final tag = parser.readTag();
+      if (tag == null) break;
+
+      final (fieldNumber, wireType) = tag;
+
+      switch (fieldNumber) {
+        case 1: // status
+          final statusData = parser.readLengthDelimited();
+          if (statusData != null) {
+            status = parseStatus(statusData);
+            result['status'] = status?.toMap();
+          }
+          break;
+        case 2: // data (repeated Data)
+          final dataBytes = parser.readLengthDelimited();
+          if (dataBytes != null) {
+            if (groupList == null) {
+              groupList = [];
+            }
+            final groupData = parseAddressBookGroup(dataBytes);
+            groupList.add(groupData);
+          }
+          break;
+        default:
+          parser.skipField(wireType);
+      }
+    }
+
+    if (groupList != null) {
+      result['data'] = groupList;
+    }
+
+    if (status != null) {
+      return result;
+    }
+    return null;
+  } catch (e) {
+    print('解析通讯录列表失败: $e');
+    return null;
+  }
+}
+
+/// 解析通讯录分组
+Map<String, dynamic> parseAddressBookGroup(Uint8List data) {
+  final parser = ProtobufParser(data);
+  final result = <String, dynamic>{};
+  final items = <Map<String, dynamic>>[];
+
+  while (parser.hasMore) {
+    final tag = parser.readTag();
+    if (tag == null) break;
+
+    final (fieldNumber, wireType) = tag;
+
+    switch (fieldNumber) {
+      case 1: // list_name
+        result['list_name'] = parser.readString();
+        break;
+      case 2: // data (repeated Data_list)
+        final itemBytes = parser.readLengthDelimited();
+        if (itemBytes != null) {
+          final item = parseAddressBookItem(itemBytes);
+          items.add(item);
+        }
+        break;
+      default:
+        parser.skipField(wireType);
+    }
+  }
+
+  if (items.isNotEmpty) {
+    result['data'] = items;
+  }
+
+  return result;
+}
+
+/// 解析通讯录项
+Map<String, dynamic> parseAddressBookItem(Uint8List data) {
+  final parser = ProtobufParser(data);
+  final result = <String, dynamic>{};
+
+  while (parser.hasMore) {
+    final tag = parser.readTag();
+    if (tag == null) break;
+
+    final (fieldNumber, wireType) = tag;
+
+    switch (fieldNumber) {
+      case 1: // chat_id
+        result['chat_id'] = parser.readString();
+        break;
+      case 2: // name
+        result['name'] = parser.readString();
+        break;
+      case 3: // avatar_url
+        result['avatar_url'] = parser.readString();
+        break;
+      case 4: // permission_level
+        result['permission_level'] = parser.readVarint()?.toInt();
+        break;
+      case 5: // noDisturb
+        final noDisturb = parser.readVarint();
+        result['no_disturb'] = noDisturb != null && noDisturb != Int64.ZERO;
+        break;
+      default:
+        parser.skipField(wireType);
+    }
+  }
+
+  return result;
+}

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:markdown_widget/markdown_widget.dart';
 import '../providers/auth_provider.dart';
 import '../providers/chat_provider.dart';
 import '../models/message_model.dart';
 import '../utils/image_loader.dart';
 import 'user_detail_screen.dart';
 import 'package:intl/intl.dart';
-import 'package:markdown_widget/markdown_widget.dart';
 import '../utils/latex_config.dart';
 import '../utils/image_preview_util.dart';
 
@@ -52,6 +52,8 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       },
       child: _ChatContent(
+        chatId: widget.chatId,
+        chatType: widget.chatType,
         chatName: widget.chatName,
         textController: _textController,
         scrollController: _scrollController,
@@ -63,12 +65,16 @@ class _ChatScreenState extends State<ChatScreen> {
 
 /// 聊天内容（分离出来以便访问Provider）
 class _ChatContent extends StatefulWidget {
+  final String chatId;
+  final int chatType;
   final String chatName;
   final TextEditingController textController;
   final ScrollController scrollController;
   final FocusNode focusNode;
 
   const _ChatContent({
+    required this.chatId,
+    required this.chatType,
     required this.chatName,
     required this.textController,
     required this.scrollController,
@@ -145,6 +151,21 @@ class _ChatContentState extends State<_ChatContent> {
         resizeToAvoidBottomInset: true, // 确保键盘弹出时调整布局
         appBar: AppBar(
           title: Text(widget.chatName),
+          actions: [
+            if (widget.chatType == 1)
+              IconButton(
+                icon: const Icon(Icons.more_vert),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => UserDetailScreen(
+                        userId: widget.chatId,
+                      ),
+                    ),
+                  );
+                },
+              ),
+          ],
         ),
         body: Column(
           children: [
@@ -180,15 +201,6 @@ class _ChatContentState extends State<_ChatContent> {
                         setState(() {
                           _hasInitializedScroll = true;
                         });
-                      }
-                    });
-                  }
-
-                  // 当键盘弹出时，自动滚动到底部
-                  if (keyboardHeight > 0 && widget.focusNode.hasFocus) {
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (widget.scrollController.hasClients && mounted) {
-                        _scrollToBottom();
                       }
                     });
                   }
@@ -392,11 +404,16 @@ class _MessageBubble extends StatelessWidget {
             CircleAvatar(
               radius: 20,
               backgroundColor: theme.colorScheme.primaryContainer,
-              child: Icon(
-                Icons.person,
-                size: 20,
-                color: theme.colorScheme.onPrimaryContainer,
-              ),
+              backgroundImage: message.sender.avatarUrl != null
+                  ? ImageLoader.networkImageProvider(message.sender.avatarUrl!)
+                  : null,
+              child: message.sender.avatarUrl == null
+                  ? Icon(
+                      Icons.person,
+                      size: 20,
+                      color: theme.colorScheme.onPrimaryContainer,
+                    )
+                  : null,
             ),
           ],
         ],
@@ -407,8 +424,25 @@ class _MessageBubble extends StatelessWidget {
   Widget _buildMessageContent(BuildContext context, MessageModel message) {
     // 优先处理 Markdown，防止 switch case 匹配问题
     if (message.contentType == 3) {
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+      final baseConfig = isDark ? MarkdownConfig.darkConfig : MarkdownConfig.defaultConfig;
+      final codeConfig = isDark
+          ? PreConfig.darkConfig.copy(
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1E1E),
+                borderRadius: BorderRadius.circular(8),
+              ),
+            )
+          : const PreConfig().copy(
+              decoration: BoxDecoration(
+                color: Color(0xFFF5F5F5),
+                borderRadius: BorderRadius.circular(8),
+              ),
+            );
+
       return MarkdownWidget(
         data: message.content.text ?? '',
+        config: baseConfig.copy(configs: [codeConfig]),
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         markdownGenerator: MarkdownGenerator(

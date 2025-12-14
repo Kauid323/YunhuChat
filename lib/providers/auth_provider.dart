@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/user_model.dart';
 import '../services/api_service.dart';
@@ -10,12 +11,30 @@ class AuthProvider with ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
   final WebSocketService _wsService = WebSocketService();
+  StreamSubscription? _messageSubscription;
 
   UserModel? get user => _user;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get isLoggedIn => _user != null && StorageService.isLoggedIn();
   WebSocketService get wsService => _wsService;
+
+  bool get isWebsocketManuallyDisabled => StorageService.isWebsocketManualDisabled();
+
+  Future<void> setWebsocketEnabled(bool enabled) async {
+    await StorageService.setWebsocketManualDisabled(!enabled);
+    if (enabled) {
+      if (_user != null) {
+        await _wsService.connect();
+        _messageSubscription?.cancel();
+        _messageSubscription = _wsService.messageStream.listen((data) {});
+      }
+    } else {
+      _messageSubscription?.cancel();
+      _wsService.disconnect();
+    }
+    notifyListeners();
+  }
 
   /// 邮箱登录
   Future<bool> login({
@@ -28,7 +47,6 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      // 调用登录API
       final response = await ApiService.emailLogin(
         email: email,
         password: password,
@@ -36,24 +54,20 @@ class AuthProvider with ChangeNotifier {
       );
 
       if (response.isSuccess && response.token != null) {
-        // 保存Token
         await StorageService.saveToken(response.token!);
         if (deviceId != null) {
           await StorageService.saveDeviceId(deviceId);
         }
 
-        // 获取用户信息
         final userInfo = await ApiService.getUserInfo();
         if (userInfo != null) {
           _user = userInfo;
           await StorageService.saveUserId(userInfo.id);
-          
-          // 连接WebSocket
-          _wsService.onMessageReceived = (data) {
-            // 处理WebSocket消息
-            print('收到WebSocket消息: ${data['cmd']}');
-          };
-          await _wsService.connect();
+
+          if (!StorageService.isWebsocketManualDisabled()) {
+            await _wsService.connect();
+            _messageSubscription = _wsService.messageStream.listen((data) {});
+          }
           
           _isLoading = false;
           notifyListeners();
@@ -84,7 +98,6 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      // 调用手机号登录API
       final response = await ApiService.verificationLogin(
         mobile: mobile,
         captcha: captcha,
@@ -92,22 +105,18 @@ class AuthProvider with ChangeNotifier {
       );
 
       if (response.isSuccess && response.token != null) {
-        // 保存Token
         await StorageService.saveToken(response.token!);
         await StorageService.saveDeviceId(deviceId);
 
-        // 获取用户信息
         final userInfo = await ApiService.getUserInfo();
         if (userInfo != null) {
           _user = userInfo;
           await StorageService.saveUserId(userInfo.id);
-          
-          // 连接WebSocket
-          _wsService.onMessageReceived = (data) {
-            // 处理WebSocket消息
-            print('收到WebSocket消息: ${data['cmd']}');
-          };
-          await _wsService.connect();
+
+          if (!StorageService.isWebsocketManualDisabled()) {
+            await _wsService.connect();
+            _messageSubscription = _wsService.messageStream.listen((data) {});
+          }
           
           _isLoading = false;
           notifyListeners();
@@ -129,6 +138,7 @@ class AuthProvider with ChangeNotifier {
 
   /// 退出登录
   Future<void> logout() async {
+    _messageSubscription?.cancel();
     _wsService.disconnect();
     await StorageService.clear();
     _user = null;
@@ -145,13 +155,14 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      // 获取用户信息
       final userInfo = await ApiService.getUserInfo();
       if (userInfo != null) {
         _user = userInfo;
-        
-        // 连接WebSocket
-        await _wsService.connect();
+
+        if (!StorageService.isWebsocketManualDisabled()) {
+          await _wsService.connect();
+          _messageSubscription = _wsService.messageStream.listen((data) {});
+        }
         
         _isLoading = false;
         notifyListeners();

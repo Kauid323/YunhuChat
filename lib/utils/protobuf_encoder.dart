@@ -188,3 +188,10 @@ Uint8List encodeGetUser({required String userId}) {
   return encoder.toBytes();
 }
 
+/// 编码获取通讯录列表请求
+Uint8List encodeAddressBookListSend({required String number}) {
+  final encoder = ProtobufEncoder();
+  encoder.writeString(2, number); // number
+  return encoder.toBytes();
+}
+

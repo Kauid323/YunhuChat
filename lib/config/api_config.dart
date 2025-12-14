@@ -15,6 +15,8 @@ class ApiConfig {
   static const String userVerificationLogin = '$apiVersion/user/verification-login';
   static const String userInfo = '$apiVersion/user/info';
   static const String getUser = '$apiVersion/user/get-user';
+  static const String friendAddressBookList = '$apiVersion/friend/address-book-list';
+  static const String friendApply = '$apiVersion/friend/apply';
   static const String conversationList = '$apiVersion/conversation/list';
   static const String listMessage = '$apiVersion/msg/list-message';
   static const String sendMessage = '$apiVersion/msg/send-message';
@@ -36,6 +38,9 @@ class ApiConfig {
   static const String communityPartitionGroupList = '$apiVersion/community/ba/group-list';
   static const String communityFollowPartition = '$apiVersion/community/ba/user-follow-ba';
   static const String communityUnfollowPartition = '$apiVersion/community/ba/user-unfollow-ba';
+  
+  // 标记已读
+  static const String markAsRead = '$apiVersion/conversation/dismiss-notification';
   
   // 超时配置
   static const Duration connectionTimeout = Duration(seconds: 30);

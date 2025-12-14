@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../models/message_model.dart';
@@ -19,6 +21,7 @@ class ChatProvider with ChangeNotifier {
   bool _isInitialLoad = true; // 标记是否是首次加载
   String? _errorMessage;
   bool _disposed = false; // 标记是否已 dispose
+  StreamSubscription? _messageSubscription;
 
   List<MessageModel> get messages => _messages;
   bool get isLoading => _isLoading;
@@ -39,26 +42,19 @@ class ChatProvider with ChangeNotifier {
 
   /// 设置WebSocket消息监听
   void _setupWebSocketListener() {
-    // 保存原有的回调
-    final originalCallback = wsService.onMessageReceived;
-    
-    wsService.onMessageReceived = (data) {
-      // 先调用原有回调
-      originalCallback?.call(data);
-      
+    _messageSubscription = wsService.messageStream.listen((data) {
       final cmd = data['cmd']?.toString() ?? '';
-      
+
       if (cmd == 'push_message') {
         final msgData = data['data']?['msg'];
         if (msgData != null) {
-          // 检查是否是当前聊天的消息
           final msgChatId = msgData['chat_id']?.toString();
           if (msgChatId == chatId) {
             _handleNewMessage(msgData);
           }
         }
       }
-    };
+    });
   }
 
   /// 处理新消息
@@ -213,9 +209,7 @@ class ChatProvider with ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
-    // 恢复 WebSocket 回调（移除我们的监听器）
-    // 注意：这里可能需要保存原始回调，但为了简化，我们直接清空
-    // 如果 wsService 是共享的，可能需要更复杂的清理逻辑
+    _messageSubscription?.cancel();
     super.dispose();
   }
 }

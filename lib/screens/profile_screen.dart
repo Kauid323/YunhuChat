@@ -4,6 +4,7 @@ import '../providers/auth_provider.dart';
 import '../utils/image_loader.dart';
 import 'login_screen.dart';
 import 'about_screen.dart';
+import 'settings_screen.dart';
 
 /// 个人资料页面
 class ProfileScreen extends StatelessWidget {
@@ -147,7 +148,11 @@ class ProfileScreen extends StatelessWidget {
                 title: const Text('设置'),
                 trailing: Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.onSurfaceVariant),
                 onTap: () {
-                  // TODO: 实现设置页面
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const SettingsScreen(),
+                    ),
+                  );
                 },
               ),
               ListTile(

@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../utils/image_loader.dart';
 import 'package:intl/intl.dart';
+import '../services/storage_service.dart';
+import '../config/api_config.dart';
+import 'chat_screen.dart';
+import 'friend_settings_screen.dart';
 
 /// 用户详情页面
 class UserDetailScreen extends StatefulWidget {
@@ -20,11 +24,46 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
   Map<String, dynamic>? _userData;
   bool _isLoading = true;
   String? _errorMessage;
+  bool _isFriend = false;
+  bool _isApplying = false;
 
   @override
   void initState() {
     super.initState();
     _loadUserDetail();
+    _checkFriendStatus();
+  }
+
+  void _checkFriendStatus() {
+    final groups = StorageService.getAddressBookCache();
+    final isFriend = groups.any((g) => g.items.any((i) => i.chatId == widget.userId));
+    _isFriend = isFriend;
+  }
+
+  Future<void> _applyFriend() async {
+    if (_isApplying) return;
+    setState(() {
+      _isApplying = true;
+    });
+    try {
+      final ok = await ApiService.applyFriend(chatId: widget.userId, chatType: ChatType.user, remark: '');
+      if (!mounted) return;
+      if (ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('已发送好友申请')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('好友申请发送失败')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isApplying = false;
+        });
+      }
+    }
   }
 
   Future<void> _loadUserDetail() async {
@@ -70,6 +109,52 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('用户详情'),
+        actions: _isFriend
+            ? [
+                const SizedBox(width: 6),
+                IconButton(
+                  icon: const Icon(Icons.settings),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => FriendSettingsScreen(
+                          userId: widget.userId,
+                          userName: _userData?['name']?.toString() ?? '',
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(width: 6),
+                IconButton(
+                  icon: const Icon(Icons.chat_bubble_outline),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => ChatScreen(
+                          chatId: widget.userId,
+                          chatType: ChatType.user,
+                          chatName: _userData?['name']?.toString() ?? '聊天',
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(width: 8),
+              ]
+            : [
+                IconButton(
+                  icon: _isApplying
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.person_add_alt_1),
+                  onPressed: _isApplying ? null : _applyFriend,
+                ),
+                const SizedBox(width: 8),
+              ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -178,15 +263,19 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                               (_userData!['medal'] as List).isNotEmpty) ...[
                             _buildSection(
                               title: '勋章',
-                              child: Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: (_userData!['medal'] as List)
-                                    .map<Widget>((medal) => Chip(
-                                          label: Text(medal['name']?.toString() ?? ''),
-                                          avatar: Icon(Icons.workspace_premium, size: 16),
-                                        ))
-                                    .toList(),
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  alignment: WrapAlignment.start,
+                                  children: (_userData!['medal'] as List)
+                                      .map<Widget>((medal) => Chip(
+                                            label: Text(medal['name']?.toString() ?? ''),
+                                            avatar: Icon(Icons.workspace_premium, size: 16),
+                                          ))
+                                      .toList(),
+                                ),
                               ),
                             ),
                           ],
@@ -214,15 +303,19 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                           if (_userData!['remark_info'] != null) ...[
                             _buildSection(
                               title: '备注信息',
-                              child: Column(
-                                children: [
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
                                   if (_userData!['remark_info']['remark_name'] != null)
                                     _buildInfoRow('备注名',
                                         _userData!['remark_info']['remark_name'].toString()),
                                   if (_userData!['remark_info']['phone_number'] != null)
                                     _buildInfoRow('手机号',
                                         _userData!['remark_info']['phone_number'].toString()),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           ],
@@ -308,4 +401,5 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
     );
   }
 }
+
 

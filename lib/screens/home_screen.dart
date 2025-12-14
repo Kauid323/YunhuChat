@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../utils/image_loader.dart';
 import 'login_screen.dart';
 
 /// 主页面（会话列表）

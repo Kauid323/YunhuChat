@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import 'package:yunhum3/models/contact_model.dart';
 import '../config/api_config.dart';
 import '../models/user_model.dart';
 import '../models/conversation_model.dart';
@@ -34,6 +35,33 @@ class ApiService {
     }
     
     return headers;
+  }
+
+  static Future<bool> applyFriend({
+    required String chatId,
+    int chatType = 1,
+    String remark = '',
+  }) async {
+    try {
+      final url = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.friendApply}');
+      final body = {
+        'chatId': chatId,
+        'chatType': chatType,
+        'remark': remark,
+      };
+
+      final response = await http.post(
+        url,
+        headers: _getHeaders(),
+        body: jsonEncode(body),
+      ).timeout(ApiConfig.connectionTimeout);
+
+      final data = jsonDecode(response.body);
+      return data['code'] == 1;
+    } catch (e) {
+      print('好友申请失败: $e');
+      return false;
+    }
   }
 
   /// 解析响应（自动处理JSON和Protobuf）
@@ -197,7 +225,7 @@ class ApiService {
         
         // 如果是 Protobuf 格式（字节数组）
         if (data is Uint8List) {
-          late Map<String, dynamic>? parseGetUser2 = parseGetUser(data);
+          var parseGetUser2 = parseGetUser(data);
           return parseGetUser2;
         }
       }
@@ -289,6 +317,69 @@ class ApiService {
     } catch (e) {
       print('获取会话列表失败: $e');
       return [];
+    }
+  }
+
+  /// 获取通讯录列表（Protobuf格式）
+  static Future<List<AddressBookGroup>> getAddressBookList() async {
+    try {
+      final url = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.friendAddressBookList}');
+      // number 参数目前可以是任意值，但在 Protobuf 定义中是必须的
+      final requestBody = encodeAddressBookListSend(number: DateTime.now().millisecondsSinceEpoch.toString());
+
+      final response = await http.post(
+        url,
+        headers: _getHeaders(isProtobuf: true),
+        body: requestBody,
+      ).timeout(ApiConfig.connectionTimeout);
+
+      if (response.statusCode == 200) {
+        final data = _parseResponse(response);
+
+        // 如果是 Protobuf 格式（字节数组）
+        if (data is Uint8List) {
+          final parsed = parseAddressBookList(data);
+          if (parsed != null) {
+            final status = parsed['status'] as Map<String, dynamic>?;
+            final groupList = parsed['data'] as List<dynamic>?;
+
+            if (status != null && status['code'] == 1 && groupList != null) {
+              return groupList
+                  .map((item) => AddressBookGroup.fromJson(item))
+                  .toList();
+            }
+          }
+        }
+      }
+      return [];
+    } catch (e) {
+      print('获取通讯录列表失败: $e');
+      return [];
+    }
+  }
+
+  /// 标记会话为已读
+  static Future<bool> markConversationAsRead({
+    required String chatId,
+    required int chatType,
+  }) async {
+    try {
+      final url = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.markAsRead}');
+      final body = {
+        'chatId': chatId,
+      };
+
+      final response = await http.post(
+        url,
+        headers: _getHeaders(),
+        body: jsonEncode(body),
+      ).timeout(ApiConfig.connectionTimeout);
+
+      final data = jsonDecode(response.body);
+      return data['code'] == 1;
+    } catch (e) {
+      print('标记已读失败: $e');
+      return false;
     }
   }
 
@@ -831,6 +922,29 @@ class ApiService {
     } catch (e) {
       print('取消关注分区失败: $e');
       return false;
+    }
+  }
+
+  /// 首页搜索
+  static Future<List<dynamic>> homeSearch(String word) async {
+    try {
+      final url = Uri.parse('${ApiConfig.baseUrl}/v1/search/home-search');
+      final body = {'word': word};
+
+      final response = await http.post(
+        url,
+        headers: _getHeaders(),
+        body: jsonEncode(body),
+      ).timeout(ApiConfig.connectionTimeout);
+
+      final data = jsonDecode(response.body);
+      if (data['code'] == 1 && data['data'] != null && data['data']['list'] != null) {
+        return data['data']['list'] as List<dynamic>;
+      }
+      return [];
+    } catch (e) {
+      print('首页搜索失败: $e');
+      return [];
     }
   }
 }

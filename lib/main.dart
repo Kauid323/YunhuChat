@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
+import 'providers/settings_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_navigation.dart';
 import 'services/storage_service.dart';
@@ -23,6 +24,7 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => SettingsProvider()),
       ],
       child: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle(
@@ -35,25 +37,27 @@ class MyApp extends StatelessWidget {
           systemNavigationBarIconBrightness: Brightness.dark,
           systemNavigationBarDividerColor: Colors.transparent,
         ),
-        child: MaterialApp(
-          title: '云湖',
-          debugShowCheckedModeBanner: false,
-          theme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: Colors.blue,
-              brightness: Brightness.light,
-            ),
-            useMaterial3: true,
-          ),
-          darkTheme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: Colors.blue,
-              brightness: Brightness.dark,
-            ),
-            useMaterial3: true,
-          ),
-          themeMode: ThemeMode.system, // 跟随系统主题，启用莫奈取色
-          builder: (context, child) {
+        child: Consumer<SettingsProvider>(
+          builder: (context, settings, _) {
+            return MaterialApp(
+              title: '云湖',
+              debugShowCheckedModeBanner: false,
+              theme: ThemeData(
+                colorScheme: ColorScheme.fromSeed(
+                  seedColor: settings.seedColor,
+                  brightness: Brightness.light,
+                ),
+                useMaterial3: true,
+              ),
+              darkTheme: ThemeData(
+                colorScheme: ColorScheme.fromSeed(
+                  seedColor: settings.seedColor,
+                  brightness: Brightness.dark,
+                ),
+                useMaterial3: true,
+              ),
+              themeMode: ThemeMode.system,
+              builder: (context, child) {
             // 根据主题动态设置系统 UI 样式
             final theme = Theme.of(context);
             final brightness = theme.brightness;
@@ -78,9 +82,10 @@ class MyApp extends StatelessWidget {
               ),
               child: child!,
             );
+              },
+              home: StorageService.isLoggedIn() ? const MainEntry() : const LoginScreen(),
+            );
           },
-          // 如果已登录，直接进入主界面，否则进入登录页
-          home: StorageService.isLoggedIn() ? const MainEntry() : const LoginScreen(),
         ),
       ),
     );

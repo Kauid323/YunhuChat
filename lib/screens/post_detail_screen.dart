@@ -283,6 +283,26 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   if (post.contentType == 2) // Markdown
                     MarkdownWidget(
                       data: post.content,
+                      config: (Theme.of(context).brightness == Brightness.dark
+                              ? MarkdownConfig.darkConfig
+                              : MarkdownConfig.defaultConfig)
+                          .copy(
+                        configs: [
+                          Theme.of(context).brightness == Brightness.dark
+                              ? PreConfig.darkConfig.copy(
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF1E1E1E),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                )
+                              : const PreConfig().copy(
+                                  decoration: BoxDecoration(
+                                    color: Color(0xFFF5F5F5),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                        ],
+                      ),
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       markdownGenerator: MarkdownGenerator(
