@@ -188,9 +188,7 @@ Status? parseStatus(Uint8List data) {
   while (parser.hasMore) {
     final tag = parser.readTag();
     if (tag == null) break;
-
     final (fieldNumber, wireType) = tag;
-
     switch (fieldNumber) {
       case 1: // number
         number = parser.readVarint();
@@ -209,6 +207,230 @@ Status? parseStatus(Uint8List data) {
   return Status(number: number, code: code, msg: msg);
 }
 
+/// 解析群聊信息 Protobuf
+Map<String, dynamic>? parseGroupInfo(Uint8List data) {
+  try {
+    final parser = ProtobufParser(data);
+    final result = <String, dynamic>{};
+    Status? status;
+    Map<String, dynamic>? groupData;
+    final historyBots = <Map<String, dynamic>>[];
+
+    while (parser.hasMore) {
+      final tag = parser.readTag();
+      if (tag == null) break;
+      final (fieldNumber, wireType) = tag;
+      switch (fieldNumber) {
+        case 1:
+          final statusData = parser.readLengthDelimited();
+          if (statusData != null) {
+            status = parseStatus(statusData);
+            result['status'] = status?.toMap();
+          }
+          break;
+        case 2:
+          final dataBytes = parser.readLengthDelimited();
+          if (dataBytes != null) {
+            groupData = _parseGroupInfoGroupData(dataBytes);
+            result['data'] = groupData;
+          }
+          break;
+        case 3:
+          final botBytes = parser.readLengthDelimited();
+          if (botBytes != null) {
+            historyBots.add(_parseGroupInfoBotData(botBytes));
+          }
+          break;
+        default:
+          parser.skipField(wireType);
+      }
+    }
+
+    if (historyBots.isNotEmpty) result['history_bot'] = historyBots;
+    if (status != null && groupData != null) return result;
+    return null;
+  } catch (e) {
+    print('解析群聊信息失败: $e');
+    return null;
+  }
+}
+
+Map<String, dynamic> _parseGroupInfoGroupData(Uint8List data) {
+  final parser = ProtobufParser(data);
+  final result = <String, dynamic>{};
+  final admins = <String>[];
+  final tagOld = <String>[];
+  final tags = <Map<String, dynamic>>[];
+
+  while (parser.hasMore) {
+    final tag = parser.readTag();
+    if (tag == null) break;
+    final (fieldNumber, wireType) = tag;
+    switch (fieldNumber) {
+      case 1:
+        result['group_id'] = parser.readString();
+        break;
+      case 2:
+        result['name'] = parser.readString();
+        break;
+      case 3:
+        result['avatar_url'] = parser.readString();
+        break;
+      case 4:
+        result['avatar_id'] = parser.readVarint()?.toInt();
+        break;
+      case 5:
+        result['introduction'] = parser.readString();
+        break;
+      case 6:
+        result['member'] = parser.readVarint()?.toInt();
+        break;
+      case 7:
+        result['create_by'] = parser.readString();
+        break;
+      case 8:
+        result['direct_join'] = parser.readVarint()?.toInt();
+        break;
+      case 9:
+        result['permisson_level'] = parser.readVarint()?.toInt();
+        break;
+      case 10:
+        result['history_msg'] = parser.readVarint()?.toInt();
+        break;
+      case 11:
+        result['category_name'] = parser.readString();
+        break;
+      case 12:
+        result['category_id'] = parser.readVarint()?.toInt();
+        break;
+      case 13:
+        result['private'] = parser.readVarint()?.toInt();
+        break;
+      case 14:
+        result['do_not_disturb'] = parser.readVarint()?.toInt();
+        break;
+      case 15:
+        result['community_id'] = parser.readVarint()?.toInt();
+        break;
+      case 16:
+        result['community_name'] = parser.readString();
+        break;
+      case 19:
+        result['top'] = parser.readVarint()?.toInt();
+        break;
+      case 20:
+        final v = parser.readString();
+        if (v != null) admins.add(v);
+        break;
+      case 22:
+        result['limited_msg_type'] = parser.readString();
+        break;
+      case 23:
+        result['owner'] = parser.readString();
+        break;
+      case 24:
+        result['recommandation'] = parser.readVarint()?.toInt();
+        break;
+      case 26:
+        final v = parser.readString();
+        if (v != null) tagOld.add(v);
+        break;
+      case 27:
+        final tagBytes = parser.readLengthDelimited();
+        if (tagBytes != null) tags.add(_parseGroupInfoTag(tagBytes));
+        break;
+      case 28:
+        result['my_group_nickname'] = parser.readString();
+        break;
+      case 29:
+        result['group_code'] = parser.readString();
+        break;
+      default:
+        parser.skipField(wireType);
+    }
+  }
+
+  if (admins.isNotEmpty) result['admin'] = admins;
+  if (tagOld.isNotEmpty) result['tag_old'] = tagOld;
+  if (tags.isNotEmpty) result['tag'] = tags;
+  return result;
+}
+
+Map<String, dynamic> _parseGroupInfoTag(Uint8List data) {
+  final parser = ProtobufParser(data);
+  final result = <String, dynamic>{};
+  while (parser.hasMore) {
+    final tag = parser.readTag();
+    if (tag == null) break;
+    final (fieldNumber, wireType) = tag;
+    switch (fieldNumber) {
+      case 1:
+        result['id'] = parser.readVarint()?.toInt();
+        break;
+      case 3:
+        result['text'] = parser.readString();
+        break;
+      case 4:
+        result['color'] = parser.readString();
+        break;
+      default:
+        parser.skipField(wireType);
+    }
+  }
+  return result;
+}
+
+Map<String, dynamic> _parseGroupInfoBotData(Uint8List data) {
+  final parser = ProtobufParser(data);
+  final result = <String, dynamic>{};
+  while (parser.hasMore) {
+    final tag = parser.readTag();
+    if (tag == null) break;
+    final (fieldNumber, wireType) = tag;
+    switch (fieldNumber) {
+      case 1:
+        result['bot_id'] = parser.readString();
+        break;
+      case 2:
+        result['name'] = parser.readString();
+        break;
+      case 3:
+        result['name_id'] = parser.readVarint()?.toInt();
+        break;
+      case 4:
+        result['avatar_url'] = parser.readString();
+        break;
+      case 5:
+        result['avatar_id'] = parser.readVarint()?.toInt();
+        break;
+      case 6:
+        result['introduction'] = parser.readString();
+        break;
+      case 7:
+        result['create_by'] = parser.readString();
+        break;
+      case 8:
+        result['create_time'] = parser.readVarint()?.toInt();
+        break;
+      case 9:
+        result['headcount'] = parser.readVarint()?.toInt();
+        break;
+      case 10:
+        result['private'] = parser.readVarint()?.toInt();
+        break;
+      case 11:
+        result['is_stop'] = parser.readVarint()?.toInt();
+        break;
+      case 12:
+        result['setting'] = parser.readString();
+        break;
+      default:
+        parser.skipField(wireType);
+    }
+  }
+  return result;
+}
+
 /// 解析用户信息 Protobuf
 Map<String, dynamic>? parseUserInfo(Uint8List data) {
   try {
@@ -220,9 +442,7 @@ Map<String, dynamic>? parseUserInfo(Uint8List data) {
     while (parser.hasMore) {
       final tag = parser.readTag();
       if (tag == null) break;
-
       final (fieldNumber, wireType) = tag;
-
       switch (fieldNumber) {
         case 1: // status
           final statusData = parser.readLengthDelimited();
@@ -243,9 +463,7 @@ Map<String, dynamic>? parseUserInfo(Uint8List data) {
       }
     }
 
-    if (status != null && userData != null) {
-      return result;
-    }
+    if (status != null && userData != null) return result;
     return null;
   } catch (e) {
     print('解析用户信息失败: $e');

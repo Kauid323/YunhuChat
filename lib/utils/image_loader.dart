@@ -3,7 +3,18 @@ import 'package:cached_network_image/cached_network_image.dart';
 
 /// 带Referer的图片加载器
 class ImageLoader {
-  static const String referer = 'http://myapp.jwznb.com';
+  static const String referer = 'https://myapp.jwznb.com';
+
+  static bool _needReferer(String url) {
+    try {
+      final uri = Uri.parse(url);
+      final host = uri.host;
+      if (host.isEmpty) return false;
+      return host == 'jwznb.com' || host.endsWith('.jwznb.com');
+    } catch (_) {
+      return false;
+    }
+  }
 
   /// 加载网络图片（带Referer）
   static Widget networkImage({
@@ -19,9 +30,11 @@ class ImageLoader {
       width: width,
       height: height,
       fit: fit ?? BoxFit.cover,
-      httpHeaders: {
-        'Referer': referer,
-      },
+      httpHeaders: _needReferer(url)
+          ? {
+              'Referer': referer,
+            }
+          : const {},
       placeholder: (context, url) => placeholder ?? const Center(
         child: CircularProgressIndicator(),
       ),
@@ -36,9 +49,11 @@ class ImageLoader {
   static ImageProvider networkImageProvider(String url) {
     return CachedNetworkImageProvider(
       url,
-      headers: {
-        'Referer': referer,
-      },
+      headers: _needReferer(url)
+          ? {
+              'Referer': referer,
+            }
+          : const {},
     );
   }
 }

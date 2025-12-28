@@ -130,6 +130,8 @@ class MessageModel {
         return 'Markdown';
       case 4:
         return '文件';
+      case 10:
+        return '视频';
       default:
         return '未知';
     }

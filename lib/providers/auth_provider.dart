@@ -63,6 +63,7 @@ class AuthProvider with ChangeNotifier {
         if (userInfo != null) {
           _user = userInfo;
           await StorageService.saveUserId(userInfo.id);
+          await StorageService.saveUserInfoCache(userInfo);
 
           if (!StorageService.isWebsocketManualDisabled()) {
             await _wsService.connect();
@@ -112,6 +113,7 @@ class AuthProvider with ChangeNotifier {
         if (userInfo != null) {
           _user = userInfo;
           await StorageService.saveUserId(userInfo.id);
+          await StorageService.saveUserInfoCache(userInfo);
 
           if (!StorageService.isWebsocketManualDisabled()) {
             await _wsService.connect();
@@ -151,6 +153,17 @@ class AuthProvider with ChangeNotifier {
       return false;
     }
 
+    final cachedUser = StorageService.getUserInfoCache();
+    if (cachedUser != null) {
+      _user = cachedUser;
+      if (!StorageService.isWebsocketManualDisabled()) {
+        await _wsService.connect();
+        _messageSubscription = _wsService.messageStream.listen((data) {});
+      }
+      notifyListeners();
+      return true;
+    }
+
     _isLoading = true;
     notifyListeners();
 
@@ -158,6 +171,8 @@ class AuthProvider with ChangeNotifier {
       final userInfo = await ApiService.getUserInfo();
       if (userInfo != null) {
         _user = userInfo;
+        await StorageService.saveUserId(userInfo.id);
+        await StorageService.saveUserInfoCache(userInfo);
 
         if (!StorageService.isWebsocketManualDisabled()) {
           await _wsService.connect();
@@ -182,5 +197,22 @@ class AuthProvider with ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
   }
-}
 
+  Future<void> refreshUserInfo() async {
+    if (!StorageService.isLoggedIn()) return;
+    _isLoading = true;
+    notifyListeners();
+    try {
+      final userInfo = await ApiService.getUserInfo();
+      if (userInfo != null) {
+        _user = userInfo;
+        await StorageService.saveUserId(userInfo.id);
+        await StorageService.saveUserInfoCache(userInfo);
+      }
+    } catch (e) {
+      _errorMessage = '获取用户信息失败: ${e.toString()}';
+    }
+    _isLoading = false;
+    notifyListeners();
+  }
+}

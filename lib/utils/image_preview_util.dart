@@ -34,7 +34,7 @@ class ImagePreviewUtil {
     // 检查是否包含 jwznb.com 域名
     if (imageUrl.contains('.jwznb.com')) {
       return {
-        'Referer': 'http://myapp.jwznb.com',
+        'Referer': 'https://myapp.jwznb.com',
       };
     }
     return null;

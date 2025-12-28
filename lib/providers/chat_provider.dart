@@ -61,16 +61,73 @@ class ChatProvider with ChangeNotifier {
   void _handleNewMessage(Map<String, dynamic> msgData) {
     if (_disposed) return;
     try {
-      final message = MessageModel.fromJson(msgData);
+      final patched = Map<String, dynamic>.from(msgData);
+      // WebSocket 推送字段为 timestamp/recv_id，适配成 MessageModel 所需字段
+      if (!patched.containsKey('send_time') && patched['timestamp'] != null) {
+        patched['send_time'] = patched['timestamp'];
+      }
+      if (!patched.containsKey('sender')) {
+        patched['sender'] = msgData['sender'] ?? <String, dynamic>{};
+      }
+
+      // 有些推送会把内容字段放在顶层（text/image_url/...），或者 content 为空
+      final dynamic rawContent = patched['content'];
+      final Map<String, dynamic> contentMap = rawContent is Map<String, dynamic>
+          ? Map<String, dynamic>.from(rawContent)
+          : (rawContent is Map ? Map<String, dynamic>.from(rawContent.cast<String, dynamic>()) : <String, dynamic>{});
+      if (contentMap.isEmpty) {
+        for (final key in <String>[
+          'text',
+          'image_url',
+          'file_name',
+          'file_url',
+          'file_size',
+          'video_url',
+          'audio_url',
+          'audio_time',
+          'quote_msg_text',
+        ]) {
+          final v = patched[key];
+          if (v != null && (v is! String || v.isNotEmpty)) {
+            contentMap[key] = v;
+          }
+        }
+        patched['content'] = contentMap;
+      } else {
+        // content 存在但内部字段缺失时，用顶层字段兜底
+        for (final key in <String>[
+          'text',
+          'image_url',
+          'file_name',
+          'file_url',
+          'file_size',
+          'video_url',
+          'audio_url',
+          'audio_time',
+          'quote_msg_text',
+        ]) {
+          final existing = contentMap[key];
+          if ((existing == null || (existing is String && existing.isEmpty)) && patched[key] != null) {
+            contentMap[key] = patched[key];
+          }
+        }
+        patched['content'] = contentMap;
+      }
+
+      final currentUserId = StorageService.getUserId();
+      final senderChatId = (patched['sender'] is Map)
+          ? (patched['sender'] as Map)['chat_id']?.toString() ?? (patched['sender'] as Map)['chatId']?.toString()
+          : null;
+      if (!patched.containsKey('direction') && currentUserId != null && senderChatId != null) {
+        patched['direction'] = senderChatId == currentUserId ? 'right' : 'left';
+      }
+
+      final message = MessageModel.fromJson(patched);
       
       // 检查消息是否已存在
       if (!_messages.any((m) => m.msgId == message.msgId)) {
+        // 新消息直接追加到末尾（不调整已加载消息的顺序）
         _messages.add(message);
-        _messages.sort((a, b) {
-          final timeA = a.sendTime ?? 0;
-          final timeB = b.sendTime ?? 0;
-          return timeA.compareTo(timeB);
-        });
         if (!_disposed) notifyListeners();
       }
     } catch (e) {
@@ -195,6 +252,7 @@ class ChatProvider with ChangeNotifier {
   Future<void> loadMoreMessages() async {
     if (_messages.isEmpty || _isLoadingMore || !_hasMoreMessages) return;
     
+    // 列表为旧 -> 新，最旧消息在开头
     final oldestMsg = _messages.first;
     await loadMessages(fromMsgId: oldestMsg.msgId);
   }

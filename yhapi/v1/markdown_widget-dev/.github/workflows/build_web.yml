@@ -1,0 +1,63 @@
+name: Build & deploy
+
+on:
+  push:
+    branches:
+      - dev
+      - master
+      - br_pre_2.0
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: '3.27.4'
+
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Test project
+        run: flutter test
+
+      - name: Build release project
+        run: cd example && flutter build web
+
+      - name: Show dir
+        run: ls && cd example && ls
+
+      - name: Download medias
+        run: dart run example/build_script/script_convert_asset.dart
+
+      - name: Upload production-ready build files
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-files
+          path: example/build/web
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: production-files
+          path: example/build/web
+
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: example/build/web

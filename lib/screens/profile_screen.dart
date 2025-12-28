@@ -7,8 +7,14 @@ import 'about_screen.dart';
 import 'settings_screen.dart';
 
 /// 个人资料页面
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _handleLogout(BuildContext context) async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -38,8 +44,12 @@ class ProfileScreen extends StatelessWidget {
             );
           }
 
-          return ListView(
-            children: [
+          return RefreshIndicator(
+            onRefresh: () async {
+              await authProvider.refreshUserInfo();
+            },
+            child: ListView(
+              children: [
               // 用户信息卡片
               Container(
                 padding: const EdgeInsets.all(24),
@@ -204,7 +214,8 @@ class ProfileScreen extends StatelessWidget {
                   );
                 },
               ),
-            ],
+              ],
+            ),
           );
         },
       ),

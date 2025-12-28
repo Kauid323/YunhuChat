@@ -195,3 +195,11 @@ Uint8List encodeAddressBookListSend({required String number}) {
   return encoder.toBytes();
 }
 
+/// 编码获取群聊信息请求
+/// 根据 group.proto 的 info_send 结构
+Uint8List encodeGroupInfoSend({required String groupId}) {
+  final encoder = ProtobufEncoder();
+  encoder.writeString(2, groupId); // group_id
+  return encoder.toBytes();
+}
+

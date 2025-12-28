@@ -2,12 +2,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
 import '../models/contact_model.dart';
+import '../models/user_model.dart';
 
 /// 本地存储服务
 class StorageService {
   static const String _keyToken = 'user_token';
   static const String _keyUserId = 'user_id';
   static const String _keyDeviceId = 'device_id';
+  static const String _keyUserInfoCache = 'user_info_cache';
 
   static const String _keyAddressBookCache = 'address_book_cache';
 
@@ -16,6 +18,8 @@ class StorageService {
 
   static const String _keyConversationAppBarActions = 'appbar_actions_conversation';
   static const String _keyContactAppBarActions = 'appbar_actions_contact';
+
+  static const String _keyConversationAvatarUrlCache = 'conversation_avatar_url_cache';
 
   static const String _keyBottomNavItems = 'bottom_nav_items';
   
@@ -59,6 +63,35 @@ class StorageService {
   /// 清除所有数据（退出登录）
   static Future<bool> clear() async {
     return await _prefs?.clear() ?? false;
+  }
+
+  static Future<bool> saveUserInfoCache(UserModel user) async {
+    final raw = jsonEncode(user.toJson());
+    return await _prefs?.setString(_keyUserInfoCache, raw) ?? false;
+  }
+
+  static UserModel? getUserInfoCache() {
+    final raw = _prefs?.getString(_keyUserInfoCache);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, dynamic>) {
+        return UserModel.fromJson(decoded);
+      }
+      if (decoded is Map) {
+        return UserModel.fromJson(decoded.cast<String, dynamic>());
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  static bool hasUserInfoCache() {
+    final raw = _prefs?.getString(_keyUserInfoCache);
+    return raw != null && raw.isNotEmpty;
+  }
+
+  static Future<bool> clearUserInfoCache() async {
+    return await _prefs?.remove(_keyUserInfoCache) ?? false;
   }
 
   /// 检查是否已登录
@@ -133,6 +166,29 @@ class StorageService {
   static Future<bool> saveAddressBookCache(List<AddressBookGroup> groups) async {
     final raw = jsonEncode(groups.map((e) => e.toJson()).toList());
     return await _prefs?.setString(_keyAddressBookCache, raw) ?? false;
+  }
+
+  static Map<String, String> getConversationAvatarUrlCache() {
+    final raw = _prefs?.getString(_keyConversationAvatarUrlCache);
+    if (raw == null || raw.isEmpty) return <String, String>{};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) {
+        return decoded.map((k, v) => MapEntry(k.toString(), v.toString()));
+      }
+    } catch (_) {}
+    return <String, String>{};
+  }
+
+  static Future<bool> saveConversationAvatarUrlCache(Map<String, String> mapping) async {
+    final raw = jsonEncode(mapping);
+    return await _prefs?.setString(_keyConversationAvatarUrlCache, raw) ?? false;
+  }
+
+  static Future<bool> mergeConversationAvatarUrlCache(Map<String, String> mapping) async {
+    final existing = getConversationAvatarUrlCache();
+    existing.addAll(mapping);
+    return saveConversationAvatarUrlCache(existing);
   }
 }
 

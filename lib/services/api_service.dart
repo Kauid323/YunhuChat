@@ -7,12 +7,77 @@ import '../models/user_model.dart';
 import '../models/conversation_model.dart';
 import '../models/message_model.dart';
 import '../models/community_model.dart';
+import '../models/discover_model.dart';
 import '../utils/protobuf_parser.dart';
 import '../utils/protobuf_encoder.dart';
 import 'storage_service.dart';
 
 /// API服务
 class ApiService {
+  static Map<String, dynamic> _normalizeMessageMap(Map<String, dynamic> input) {
+    final m = Map<String, dynamic>.from(input);
+    final dynamic rawContent = m['content'];
+    final Map<String, dynamic> contentMap = rawContent is Map<String, dynamic>
+        ? Map<String, dynamic>.from(rawContent)
+        : (rawContent is Map ? Map<String, dynamic>.from(rawContent.cast<String, dynamic>()) : <String, dynamic>{});
+
+    if (contentMap.isEmpty) {
+      for (final key in <String>[
+        'text',
+        'image_url',
+        'file_name',
+        'file_url',
+        'file_size',
+        'video_url',
+        'audio_url',
+        'audio_time',
+        'quote_msg_text',
+      ]) {
+        final v = m[key];
+        if (v != null && (v is! String || v.isNotEmpty)) {
+          contentMap[key] = v;
+        }
+
+      }
+      m['content'] = contentMap;
+    } else {
+      for (final key in <String>[
+        'text',
+        'image_url',
+        'file_name',
+        'file_url',
+        'file_size',
+        'video_url',
+        'audio_url',
+        'audio_time',
+        'quote_msg_text',
+      ]) {
+        final existing = contentMap[key];
+        if ((existing == null || (existing is String && existing.isEmpty)) && m[key] != null) {
+          contentMap[key] = m[key];
+        }
+      }
+      m['content'] = contentMap;
+    }
+
+    return m;
+  }
+
+  static Map<String, dynamic> _ensureMessageDirection(Map<String, dynamic> input) {
+    final m = Map<String, dynamic>.from(input);
+    if (m['direction'] != null) return m;
+    final currentUserId = StorageService.getUserId();
+    if (currentUserId == null) return m;
+    final sender = m['sender'];
+    if (sender is Map) {
+      final senderChatId = sender['chat_id']?.toString() ?? sender['chatId']?.toString();
+      if (senderChatId != null) {
+        m['direction'] = senderChatId == currentUserId ? 'right' : 'left';
+      }
+    }
+    return m;
+  }
+
   /// 获取通用请求头
   static Map<String, String> _getHeaders({
     bool includeToken = true,
@@ -84,6 +149,126 @@ class ApiService {
         // 如果 JSON 失败，可能是 Protobuf
         return response.bodyBytes;
       }
+    }
+  }
+
+  static Future<List<String>> getDiscoverGroupCategories({String appChannel = 'default'}) async {
+    try {
+      final url = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.discoverRecommendCategoryList}');
+      final body = {
+        'appChannel': appChannel,
+      };
+
+      final response = await http
+          .post(
+            url,
+            headers: _getHeaders(),
+            body: jsonEncode(body),
+          )
+          .timeout(ApiConfig.connectionTimeout);
+
+      if (response.statusCode != 200) return [];
+      final data = _parseResponse(response);
+      if (data is! Map<String, dynamic>) return [];
+      if (data['code'] != 1) return [];
+
+      final parsed = DiscoverCategoryList.fromJson(data);
+      return parsed.categories;
+    } catch (e) {
+      print('获取发现群聊分区失败: $e');
+      return [];
+    }
+  }
+
+  static Future<List<DiscoverGroupItem>> getDiscoverGroupList({
+    required String category,
+    required String keyword,
+    int size = 30,
+    int page = 1,
+  }) async {
+    try {
+      final url = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.discoverRecommendList}');
+      final body = {
+        'category': category,
+        'keyword': keyword,
+        'size': size,
+        'page': page,
+      };
+
+      final response = await http
+          .post(
+            url,
+            headers: _getHeaders(),
+            body: jsonEncode(body),
+          )
+          .timeout(ApiConfig.connectionTimeout);
+
+      if (response.statusCode != 200) return [];
+      final data = _parseResponse(response);
+      if (data is! Map<String, dynamic>) return [];
+      if (data['code'] != 1) return [];
+
+      final Map<String, dynamic>? dataMap = data['data'] is Map
+          ? Map<String, dynamic>.from((data['data'] as Map).cast<dynamic, dynamic>())
+          : null;
+      final rawList = dataMap?['groupList'] ?? dataMap?['group_list'];
+      if (rawList is! List) return [];
+
+      final result = <DiscoverGroupItem>[];
+      for (final item in rawList) {
+        if (item is Map<String, dynamic>) {
+          result.add(DiscoverGroupItem.fromJson(item));
+          continue;
+        }
+        if (item is Map) {
+          result.add(DiscoverGroupItem.fromJson(Map<String, dynamic>.from(item.cast<dynamic, dynamic>())));
+          continue;
+        }
+      }
+      return result;
+    } catch (e) {
+      print('获取发现群聊列表失败: $e');
+      return [];
+    }
+  }
+
+  static Future<List<DiscoverBotItem>> getDiscoverBotList() async {
+    try {
+      final url = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.discoverRecommendBotList}');
+      final response = await http
+          .post(
+            url,
+            headers: _getHeaders(),
+            body: jsonEncode(<String, dynamic>{}),
+          )
+          .timeout(ApiConfig.connectionTimeout);
+
+      if (response.statusCode != 200) return [];
+      final data = _parseResponse(response);
+      if (data is! Map<String, dynamic>) return [];
+      if (data['code'] != 1) return [];
+
+      final Map<String, dynamic>? dataMap = data['data'] is Map
+          ? Map<String, dynamic>.from((data['data'] as Map).cast<dynamic, dynamic>())
+          : null;
+      final rawList = dataMap?['botList'] ?? dataMap?['bot_list'];
+      if (rawList is! List) return [];
+
+      final result = <DiscoverBotItem>[];
+      for (final item in rawList) {
+        if (item is Map<String, dynamic>) {
+          result.add(DiscoverBotItem.fromJson(item));
+          continue;
+        }
+        if (item is Map) {
+          result.add(DiscoverBotItem.fromJson(Map<String, dynamic>.from(item.cast<dynamic, dynamic>())));
+          continue;
+        }
+      }
+      return result;
+    } catch (e) {
+      print('获取机器人推荐列表失败: $e');
+      return [];
     }
   }
 
@@ -383,6 +568,34 @@ class ApiService {
     }
   }
 
+  static Future<Map<String, dynamic>?> getGroupInfo({required String groupId}) async {
+    try {
+      final url = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.groupInfo}');
+      final bodyBytes = encodeGroupInfoSend(groupId: groupId);
+
+      final response = await http.post(
+        url,
+        headers: _getHeaders(isProtobuf: true),
+        body: bodyBytes,
+      ).timeout(ApiConfig.connectionTimeout);
+
+      if (response.statusCode != 200) return null;
+      final data = _parseResponse(response);
+      if (data is Uint8List) {
+        return parseGroupInfo(data);
+      }
+
+      if (data is Map<String, dynamic>) {
+        return data;
+      }
+
+      return null;
+    } catch (e) {
+      print('获取群聊信息失败: $e');
+      return null;
+    }
+  }
+
   /// 获取消息列表（Protobuf格式）
   static Future<List<MessageModel>> getMessageList({
     required String chatId,
@@ -419,7 +632,17 @@ class ApiService {
             
             if (status != null && status['code'] == 1 && msgList != null) {
               return msgList
-                  .map((item) => MessageModel.fromJson(item))
+                  .map((item) {
+                    if (item is Map<String, dynamic>) {
+                      return MessageModel.fromJson(_normalizeMessageMap(item));
+                    }
+                    if (item is Map) {
+                      return MessageModel.fromJson(
+                        _normalizeMessageMap(item.cast<String, dynamic>()),
+                      );
+                    }
+                    return MessageModel.fromJson(const <String, dynamic>{});
+                  })
                   .toList();
             }
           }
@@ -429,7 +652,17 @@ class ApiService {
         if (data is Map<String, dynamic>) {
           if (data['msg'] != null && data['msg'] is List) {
             return (data['msg'] as List)
-                .map((item) => MessageModel.fromJson(item))
+                .map((item) {
+                  if (item is Map<String, dynamic>) {
+                    return MessageModel.fromJson(_normalizeMessageMap(item));
+                  }
+                  if (item is Map) {
+                    return MessageModel.fromJson(
+                      _normalizeMessageMap(item.cast<String, dynamic>()),
+                    );
+                  }
+                  return MessageModel.fromJson(const <String, dynamic>{});
+                })
                 .toList();
           }
         }
@@ -621,6 +854,79 @@ class ApiService {
     } catch (e) {
       print('获取分区列表失败: $e');
       return [];
+    }
+  }
+
+  static Future<List<CommunityPost>> searchCommunityPosts({
+    required String keyword,
+    int page = 1,
+    int size = 10,
+    int typ = 3,
+  }) async {
+    try {
+      final url = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.communitySearch}');
+      final body = {
+        'typ': typ,
+        'keyword': keyword,
+        'size': size,
+        'page': page,
+      };
+
+      final response = await http.post(
+        url,
+        headers: _getHeaders(),
+        body: jsonEncode(body),
+      ).timeout(ApiConfig.connectionTimeout);
+
+      final data = jsonDecode(response.body);
+      if (data['code'] == 1 && data['data'] != null) {
+        final posts = data['data']['posts'] as List?;
+        if (posts != null) {
+          return posts.map((e) => CommunityPost.fromJson(e)).toList();
+        }
+      }
+      return [];
+    } catch (e) {
+      print('搜索文章失败: $e');
+      return [];
+    }
+  }
+
+  static Future<CommunitySearchResult?> searchCommunity({
+    required String keyword,
+    int page = 1,
+    int size = 10,
+    int typ = 3,
+  }) async {
+    try {
+      final url = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.communitySearch}');
+      final body = {
+        'typ': typ,
+        'keyword': keyword,
+        'size': size,
+        'page': page,
+      };
+
+      final response = await http.post(
+        url,
+        headers: _getHeaders(),
+        body: jsonEncode(body),
+      ).timeout(ApiConfig.connectionTimeout);
+
+      final data = jsonDecode(response.body);
+      if (data['code'] == 1 && data['data'] != null) {
+        final d = data['data'];
+        if (d is Map<String, dynamic>) {
+          return CommunitySearchResult.fromJson(d);
+        }
+        if (d is Map) {
+          return CommunitySearchResult.fromJson(d.cast<String, dynamic>());
+        }
+      }
+      return null;
+    } catch (e) {
+      print('搜索文章/分区失败: $e');
+      return null;
     }
   }
 

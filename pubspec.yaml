@@ -65,6 +65,9 @@ dependencies:
   markdown_widget: ^2.3.2+8
   markdown: ^7.2.1
   flutter_math_fork: ^0.7.3
+  flutter_widget_from_html: ^0.16.1
+  fwfh_chewie: ^0.16.1
+
   
   # 图片预览
   extended_image: ^8.2.0
@@ -86,6 +89,12 @@ dev_dependencies:
   
   # Protobuf 代码生成
   protoc_plugin: ^21.1.2
+
+dependency_overrides:
+  markdown_widget:
+    path: yhapi/v1/markdown_widget-dev
+  fwfh_chewie:
+    path: yhapi/v1/fwfh_chewie-0.16.1
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

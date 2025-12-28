@@ -1,30 +1,118 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:markdown_widget/markdown_widget.dart';
+import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 import '../providers/auth_provider.dart';
 import '../providers/chat_provider.dart';
 import '../models/message_model.dart';
 import '../utils/image_loader.dart';
 import 'user_detail_screen.dart';
+import 'group_info_screen.dart';
 import 'package:intl/intl.dart';
 import '../utils/latex_config.dart';
-import '../utils/image_preview_util.dart';
 
 /// 聊天页面
 class ChatScreen extends StatefulWidget {
   final String chatId;
   final int chatType;
   final String chatName;
+  final bool showAppBar;
 
   const ChatScreen({
     super.key,
     required this.chatId,
     required this.chatType,
     required this.chatName,
+    this.showAppBar = true,
   });
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
+}
+
+void _showVideoPlayerDialog(BuildContext context, String videoUrl) {
+  debugPrint('[video10] open dialog url=$videoUrl');
+  showDialog(
+    context: context,
+    barrierColor: Colors.black,
+    builder: (context) {
+      debugPrint('[video10] build HtmlWidget video url=$videoUrl');
+      return Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.black,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: Center(
+                  child: HtmlWidget(
+                    '<video controls autoplay src="$videoUrl"></video>',
+                    factoryBuilder: () => _ChatHtmlWidgetFactory(),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 6,
+                right: 6,
+                child: IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.black.withOpacity(0.35),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+void _showImagePreviewDialog(BuildContext context, String imageUrl) {
+  showDialog(
+    context: context,
+    barrierColor: Colors.black,
+    builder: (context) {
+      return Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: InteractiveViewer(
+                minScale: 0.8,
+                maxScale: 4.0,
+                child: Center(
+                  child: ImageLoader.networkImage(
+                    url: imageUrl,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 12,
+              right: 12,
+              child: IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close, color: Colors.white),
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.black.withOpacity(0.4),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
 }
 
 class _ChatScreenState extends State<ChatScreen> {
@@ -58,6 +146,77 @@ class _ChatScreenState extends State<ChatScreen> {
         textController: _textController,
         scrollController: _scrollController,
         focusNode: _focusNode,
+        showAppBar: widget.showAppBar,
+      ),
+    );
+  }
+}
+
+class _ChatHtmlWidgetFactory extends WidgetFactory {}
+
+class _AnimatedInsertedMessage extends StatefulWidget {
+  final bool play;
+  final VoidCallback? onAnimationEnd;
+  final Widget child;
+
+  const _AnimatedInsertedMessage({
+    super.key,
+    required this.play,
+    required this.child,
+    this.onAnimationEnd,
+  });
+
+  @override
+  State<_AnimatedInsertedMessage> createState() => _AnimatedInsertedMessageState();
+}
+
+class _AnimatedInsertedMessageState extends State<_AnimatedInsertedMessage>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _opacity;
+  late final Animation<Offset> _offset;
+  bool _played = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+    );
+    _opacity = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
+    _offset = Tween<Offset>(begin: const Offset(0, 0.08), end: Offset.zero)
+        .animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+  }
+
+  @override
+  void didUpdateWidget(covariant _AnimatedInsertedMessage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.play && !_played) {
+      _played = true;
+      _controller.forward().whenComplete(() {
+        widget.onAnimationEnd?.call();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.play && !_played) {
+      return widget.child;
+    }
+
+    return FadeTransition(
+      opacity: _opacity,
+      child: SlideTransition(
+        position: _offset,
+        child: widget.child,
       ),
     );
   }
@@ -71,6 +230,7 @@ class _ChatContent extends StatefulWidget {
   final TextEditingController textController;
   final ScrollController scrollController;
   final FocusNode focusNode;
+  final bool showAppBar;
 
   const _ChatContent({
     required this.chatId,
@@ -79,6 +239,7 @@ class _ChatContent extends StatefulWidget {
     required this.textController,
     required this.scrollController,
     required this.focusNode,
+    required this.showAppBar,
   });
 
   @override
@@ -87,6 +248,10 @@ class _ChatContent extends StatefulWidget {
 
 class _ChatContentState extends State<_ChatContent> {
   bool _hasInitializedScroll = false; // 标记是否已经初始化滚动
+  final Set<String> _knownMsgIds = <String>{};
+  final Set<String> _newlyInsertedMsgIds = <String>{};
+  ChatProvider? _chatProvider;
+  bool _hasSeededKnownIds = false;
 
   @override
   void initState() {
@@ -96,8 +261,72 @@ class _ChatContentState extends State<_ChatContent> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final provider = Provider.of<ChatProvider>(context);
+    if (!identical(_chatProvider, provider)) {
+      _chatProvider?.removeListener(_onChatProviderChanged);
+      _chatProvider = provider;
+      _chatProvider?.addListener(_onChatProviderChanged);
+      _onChatProviderChanged();
+    }
+  }
+
+  void _onChatProviderChanged() {
+    if (!mounted) return;
+    final provider = _chatProvider;
+    if (provider == null) return;
+
+    final currentMsgIds = provider.messages
+        .map((m) => m.msgId)
+        .whereType<String>()
+        .toSet();
+
+    // 首次建立已知集合：不播放动画
+    if (!_hasSeededKnownIds) {
+      _hasSeededKnownIds = true;
+      _knownMsgIds
+        ..clear()
+        ..addAll(currentMsgIds);
+      _newlyInsertedMsgIds.clear();
+      return;
+    }
+
+    // 加载更多 / 首次加载 / 全量刷新时，避免整屏动画和状态抖动
+    if (provider.isLoadingMore || provider.isInitialLoad) {
+      _knownMsgIds
+        ..clear()
+        ..addAll(currentMsgIds);
+      _newlyInsertedMsgIds.clear();
+      return;
+    }
+
+    final newMsgIds = currentMsgIds.difference(_knownMsgIds);
+    if (newMsgIds.isEmpty) {
+      // 处理删除/撤回等情况：同步 known 集合
+      if (currentMsgIds.length != _knownMsgIds.length) {
+        _knownMsgIds
+          ..clear()
+          ..addAll(currentMsgIds);
+      }
+      return;
+    }
+
+    // 如果一次性新增太多（例如 sendMessage 后触发 loadMessages 全量替换），只播最后一条
+    final idsToAnimate = newMsgIds.length > 3
+        ? <String>{newMsgIds.last}
+        : newMsgIds;
+
+    setState(() {
+      _newlyInsertedMsgIds.addAll(idsToAnimate);
+      _knownMsgIds.addAll(newMsgIds);
+    });
+  }
+
+  @override
   void dispose() {
     widget.focusNode.removeListener(_onFocusChange);
+    _chatProvider?.removeListener(_onChatProviderChanged);
     super.dispose();
   }
 
@@ -105,7 +334,12 @@ class _ChatContentState extends State<_ChatContent> {
     // 当输入框获得焦点时，延迟滚动到底部，等待键盘弹出
     if (widget.focusNode.hasFocus) {
       Future.delayed(const Duration(milliseconds: 300), () {
-        if (mounted && widget.focusNode.hasFocus) {
+        if (!mounted || !widget.focusNode.hasFocus) return;
+        if (!widget.scrollController.hasClients) return;
+        final position = widget.scrollController.position;
+        final distanceToBottom = position.maxScrollExtent - position.pixels;
+        // 只有当用户本来就在接近底部（正在看最新消息）时，才自动滚回最新
+        if (distanceToBottom < 120) {
           _scrollToBottom();
         }
       });
@@ -149,24 +383,39 @@ class _ChatContentState extends State<_ChatContent> {
     
     return Scaffold(
         resizeToAvoidBottomInset: true, // 确保键盘弹出时调整布局
-        appBar: AppBar(
-          title: Text(widget.chatName),
-          actions: [
-            if (widget.chatType == 1)
-              IconButton(
-                icon: const Icon(Icons.more_vert),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => UserDetailScreen(
-                        userId: widget.chatId,
-                      ),
+        appBar: widget.showAppBar
+            ? AppBar(
+                title: Text(widget.chatName),
+                actions: [
+                  if (widget.chatType == 1)
+                    IconButton(
+                      icon: const Icon(Icons.more_vert),
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => UserDetailScreen(
+                              userId: widget.chatId,
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                  );
-                },
-              ),
-          ],
-        ),
+                  if (widget.chatType == 2)
+                    IconButton(
+                      icon: const Icon(Icons.more_vert),
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => GroupInfoScreen(
+                              groupId: widget.chatId,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                ],
+              )
+            : null,
         body: Column(
           children: [
             // 消息列表
@@ -234,14 +483,27 @@ class _ChatContentState extends State<_ChatContent> {
                             child: Center(child: CircularProgressIndicator()),
                           );
                         }
-                        
+
                         // 调整索引（如果有加载指示器）
                         final messageIndex = chatProvider.isLoadingMore ? index - 1 : index;
                         if (messageIndex < 0 || messageIndex >= chatProvider.messages.length) {
                           return const SizedBox.shrink();
                         }
                         final message = chatProvider.messages[messageIndex];
-                        return _MessageBubble(message: message);
+                        final msgId = message.msgId;
+                        final shouldAnimate = msgId != null && _newlyInsertedMsgIds.contains(msgId);
+                        return _AnimatedInsertedMessage(
+                          key: msgId != null ? ValueKey<String>(msgId) : null,
+                          play: shouldAnimate,
+                          onAnimationEnd: () {
+                            if (!mounted) return;
+                            if (msgId == null) return;
+                            setState(() {
+                              _newlyInsertedMsgIds.remove(msgId);
+                            });
+                          },
+                          child: _MessageBubble(message: message),
+                        );
                       },
                     ),
                   );
@@ -426,29 +688,239 @@ class _MessageBubble extends StatelessWidget {
     if (message.contentType == 3) {
       final isDark = Theme.of(context).brightness == Brightness.dark;
       final baseConfig = isDark ? MarkdownConfig.darkConfig : MarkdownConfig.defaultConfig;
+
+      Widget codeBlockWrapper(Widget child, String code, String language) {
+        return Builder(
+          builder: (context) {
+            final label = language.trim();
+            return Stack(
+              children: [
+                child,
+                Positioned(
+                  top: 6,
+                  right: 6,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (label.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.85),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: Theme.of(context).colorScheme.outlineVariant,
+                            ),
+                          ),
+                          child: Text(
+                            label,
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                  fontSize: 10,
+                                ),
+                          ),
+                        ),
+                      const SizedBox(width: 6),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.85),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.outlineVariant,
+                          ),
+                        ),
+                        child: IconButton(
+                          icon: const Icon(Icons.copy, size: 16),
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.all(4),
+                          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                          tooltip: '复制',
+                          onPressed: () async {
+                            await Clipboard.setData(ClipboardData(text: code));
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('已复制')),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      }
       final codeConfig = isDark
           ? PreConfig.darkConfig.copy(
               decoration: BoxDecoration(
                 color: const Color(0xFF1E1E1E),
                 borderRadius: BorderRadius.circular(8),
               ),
+              wrapper: codeBlockWrapper,
             )
           : const PreConfig().copy(
               decoration: BoxDecoration(
                 color: Color(0xFFF5F5F5),
                 borderRadius: BorderRadius.circular(8),
               ),
+              wrapper: codeBlockWrapper,
             );
 
       return MarkdownWidget(
         data: message.content.text ?? '',
-        config: baseConfig.copy(configs: [codeConfig]),
+        config: baseConfig.copy(
+          configs: [
+            codeConfig,
+          ],
+        ),
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         markdownGenerator: MarkdownGenerator(
           inlineSyntaxList: [LatexSyntax()],
           generators: [latexGenerator],
         ),
+      );
+    }
+
+    if (message.contentType == 8) {
+      final theme = Theme.of(context);
+      final isDark = theme.brightness == Brightness.dark;
+      final effectiveTextColor = message.isMyMessage
+          ? theme.colorScheme.onPrimary
+          : theme.colorScheme.onSurface;
+      String cssColor(Color color) {
+        final rgb = color.value & 0x00FFFFFF;
+        return '#${rgb.toRadixString(16).padLeft(6, '0')}';
+      }
+
+      final rawHtml = message.content.text ?? '';
+      final safeHtml = rawHtml.replaceAll(
+        RegExp(r'display\s*:\s*flex', caseSensitive: false),
+        'display: block',
+      );
+
+      bool needReferer(String url) {
+        try {
+          final uri = Uri.parse(url);
+          final host = uri.host;
+          if (host.isEmpty) return false;
+          return host == 'jwznb.com' || host.endsWith('.jwznb.com');
+        } catch (_) {
+          return false;
+        }
+      }
+
+      return HtmlWidget(
+        safeHtml,
+        factoryBuilder: () => _ChatHtmlWidgetFactory(),
+        textStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: message.isMyMessage
+                  ? Theme.of(context).colorScheme.onPrimary
+                  : Theme.of(context).colorScheme.onSurface,
+            ),
+        onTapUrl: (url) async {
+          await Clipboard.setData(ClipboardData(text: url));
+          if (!context.mounted) return true;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('链接已复制')),
+          );
+          return true;
+        },
+        customWidgetBuilder: (element) {
+          // Let flutter_widget_from_html render everything by default.
+          // Only hijack jwznb.com images to inject Referer headers via ImageLoader.
+          if (element.localName == 'img') {
+            final src = element.attributes['src'];
+            if (src == null || src.isEmpty) return null;
+            if (!needReferer(src)) return null;
+
+            return GestureDetector(
+              onTap: () {
+                _showImagePreviewDialog(context, src);
+              },
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: ImageLoader.networkImage(
+                  url: src,
+                  fit: BoxFit.contain,
+                ),
+              ),
+            );
+          }
+
+          if (element.localName == 'table') {
+            // The default table renderer may overflow horizontally.
+            // Wrap it in a horizontal scroll view and let HtmlWidget do the real rendering.
+            return SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 320),
+                child: HtmlWidget(
+                  element.outerHtml,
+                  textStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: message.isMyMessage
+                            ? Theme.of(context).colorScheme.onPrimary
+                            : Theme.of(context).colorScheme.onSurface,
+                      ),
+                  onTapUrl: (url) async {
+                    await Clipboard.setData(ClipboardData(text: url));
+                    if (!context.mounted) return true;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('链接已复制')),
+                    );
+                    return true;
+                  },
+                  customWidgetBuilder: (e) {
+                    // Avoid infinite recursion.
+                    if (e.localName == 'table') return null;
+                    if (e.localName == 'img') {
+                      final src = e.attributes['src'];
+                      if (src == null || src.isEmpty) return null;
+                      if (!needReferer(src)) return null;
+                      return GestureDetector(
+                        onTap: () {
+                          _showImagePreviewDialog(context, src);
+                        },
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: ImageLoader.networkImage(
+                            url: src,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      );
+                    }
+                    return null;
+                  },
+                  customStylesBuilder: (e) {
+                    if (!isDark) return null;
+                    final style = e.attributes['style'];
+                    if (style == null || style.isEmpty) return null;
+                    final normalized = style.toLowerCase().replaceAll(' ', '');
+                    final hasBadBlack = normalized.contains('color:#000000') ||
+                        normalized.contains('color:rgb(0,0,0)');
+                    final hasNone = normalized.contains('color:none');
+                    if (!hasBadBlack && !hasNone) return null;
+                    return <String, String>{'color': cssColor(effectiveTextColor)};
+                  },
+                ),
+              ),
+            );
+          }
+          return null;
+        },
+        customStylesBuilder: (element) {
+          if (!isDark) return null;
+          final style = element.attributes['style'];
+          if (style == null || style.isEmpty) return null;
+          final normalized = style.toLowerCase().replaceAll(' ', '');
+          final hasBadBlack =
+              normalized.contains('color:#000000') || normalized.contains('color:rgb(0,0,0)');
+          final hasNone = normalized.contains('color:none');
+          if (!hasBadBlack && !hasNone) return null;
+          return <String, String>{'color': cssColor(effectiveTextColor)};
+        },
       );
     }
 
@@ -466,12 +938,7 @@ class _MessageBubble extends StatelessWidget {
         return message.content.imageUrl != null
             ? GestureDetector(
                 onTap: () {
-                  // 点击图片时显示预览
-                  ImagePreviewUtil.showImagePreview(
-                    context,
-                    imageUrl: message.content.imageUrl!,
-                    title: '图片消息',
-                  );
+                  _showImagePreviewDialog(context, message.content.imageUrl!);
                 },
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
@@ -508,6 +975,56 @@ class _MessageBubble extends StatelessWidget {
               ),
             ),
           ],
+        );
+      case 10: // 视频
+        final url = message.content.videoUrl;
+        if (url == null || url.isEmpty) {
+          return const Text('[视频]');
+        }
+        final theme = Theme.of(context);
+        return GestureDetector(
+          onTap: () {
+            final uri = Uri.tryParse(url);
+            final isAbsolute = uri != null && uri.hasScheme;
+            if (!isAbsolute) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('视频地址无效')),
+              );
+              return;
+            }
+            _showVideoPlayerDialog(context, url);
+          },
+          child: Container(
+            width: 220,
+            height: 140,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Icon(
+                  Icons.videocam,
+                  size: 44,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                Container(
+                  width: 54,
+                  height: 54,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.4),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.play_arrow,
+                    color: Colors.white,
+                    size: 34,
+                  ),
+                ),
+              ],
+            ),
+          ),
         );
       case 11: // 语音
         return Row(

@@ -133,11 +133,31 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
       _isLoading = true;
     });
 
+    final avatarCache = StorageService.getConversationAvatarUrlCache();
+
     try {
       final conversations = await ApiService.getConversationList();
       if (mounted) {
+        final cacheToSave = <String, String>{};
+        final patched = conversations.map((c) {
+          final cachedUrl = avatarCache[c.chatId];
+          final url = c.avatarUrl;
+          if (url != null && url.isNotEmpty) {
+            cacheToSave[c.chatId] = url;
+            return c;
+          }
+          if (cachedUrl != null && cachedUrl.isNotEmpty) {
+            return c.copyWith(avatarUrl: cachedUrl);
+          }
+          return c;
+        }).toList();
+
+        if (cacheToSave.isNotEmpty) {
+          // ignore: unawaited_futures
+          StorageService.mergeConversationAvatarUrlCache(cacheToSave);
+        }
         setState(() {
-          _conversations = conversations;
+          _conversations = patched;
           _isLoading = false;
         });
       }

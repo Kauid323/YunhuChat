@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../models/community_model.dart';
 import '../services/api_service.dart';
 import 'package:markdown_widget/markdown_widget.dart';
 import '../utils/image_loader.dart';
 import '../utils/latex_config.dart';
+import 'user_detail_screen.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final int postId;
@@ -250,30 +253,46 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   // Author info
                   Row(
                     children: [
-                      CircleAvatar(
-                        radius: 20,
-                        backgroundImage: post.senderAvatar.isNotEmpty
-                            ? ImageLoader.networkImageProvider(post.senderAvatar)
-                            : null,
-                         child: post.senderAvatar.isEmpty 
-                            ? const Icon(Icons.person) 
-                            : null,
-                      ),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            post.senderNickname,
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          Text(
-                            post.createTimeText,
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      InkWell(
+                        borderRadius: BorderRadius.circular(24),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => UserDetailScreen(
+                                userId: post.senderId,
+                              ),
                             ),
-                          ),
-                        ],
+                          );
+                        },
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 20,
+                              backgroundImage: post.senderAvatar.isNotEmpty
+                                  ? ImageLoader.networkImageProvider(post.senderAvatar)
+                                  : null,
+                              child: post.senderAvatar.isEmpty
+                                  ? const Icon(Icons.person)
+                                  : null,
+                            ),
+                            const SizedBox(width: 12),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  post.senderNickname,
+                                  style: Theme.of(context).textTheme.titleMedium,
+                                ),
+                                Text(
+                                  post.createTimeText,
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -288,19 +307,79 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                               : MarkdownConfig.defaultConfig)
                           .copy(
                         configs: [
-                          Theme.of(context).brightness == Brightness.dark
-                              ? PreConfig.darkConfig.copy(
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF1E1E1E),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                )
-                              : const PreConfig().copy(
-                                  decoration: BoxDecoration(
-                                    color: Color(0xFFF5F5F5),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
+                          (Theme.of(context).brightness == Brightness.dark
+                                  ? PreConfig.darkConfig
+                                  : const PreConfig())
+                              .copy(
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).brightness == Brightness.dark
+                                  ? const Color(0xFF1E1E1E)
+                                  : const Color(0xFFF5F5F5),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            wrapper: (child, code, language) {
+                              return Builder(
+                                builder: (context) {
+                                  final label = language.trim();
+                                  return Stack(
+                                    children: [
+                                      child,
+                                      Positioned(
+                                        top: 6,
+                                        right: 6,
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            if (label.isNotEmpty)
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.85),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                  border: Border.all(
+                                                    color: Theme.of(context).colorScheme.outlineVariant,
+                                                  ),
+                                                ),
+                                                child: Text(
+                                                  label,
+                                                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                                        fontSize: 10,
+                                                      ),
+                                                ),
+                                              ),
+                                            const SizedBox(width: 6),
+                                            Container(
+                                              decoration: BoxDecoration(
+                                                color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.85),
+                                                borderRadius: BorderRadius.circular(6),
+                                                border: Border.all(
+                                                  color: Theme.of(context).colorScheme.outlineVariant,
+                                                ),
+                                              ),
+                                              child: IconButton(
+                                                icon: const Icon(Icons.copy, size: 16),
+                                                visualDensity: VisualDensity.compact,
+                                                padding: const EdgeInsets.all(4),
+                                                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                                                tooltip: '复制',
+                                                onPressed: () async {
+                                                  await Clipboard.setData(ClipboardData(text: code));
+                                                  if (!context.mounted) return;
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                    const SnackBar(content: Text('已复制')),
+                                                  );
+                                                },
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              );
+                            },
+                          ),
                         ],
                       ),
                       shrinkWrap: true,

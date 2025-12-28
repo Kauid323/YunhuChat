@@ -23,6 +23,10 @@ class ApiConfig {
   static const String groupInfo = '$apiVersion/group/info';
   static const String listMember = '$apiVersion/group/list-member';
   static const String getVerificationCode = '$apiVersion/verification/get-verification-code';
+
+  static const String discoverRecommendCategoryList = '$apiVersion/user/recommend-category-list';
+  static const String discoverRecommendList = '$apiVersion/user/recommend-list';
+  static const String discoverRecommendBotList = '$apiVersion/user/recommend';
   
   // 社区API端点
   static const String communityPostList = '$apiVersion/community/posts/post-list';
@@ -38,6 +42,7 @@ class ApiConfig {
   static const String communityPartitionGroupList = '$apiVersion/community/ba/group-list';
   static const String communityFollowPartition = '$apiVersion/community/ba/user-follow-ba';
   static const String communityUnfollowPartition = '$apiVersion/community/ba/user-unfollow-ba';
+  static const String communitySearch = '$apiVersion/community/search';
   
   // 标记已读
   static const String markAsRead = '$apiVersion/conversation/dismiss-notification';
@@ -80,6 +85,7 @@ class ContentType {
   static const int post = 6;
   static const int sticker = 7;
   static const int html = 8;
+  static const int video = 10;
   static const int audio = 11;
   static const int call = 13;
   
@@ -101,6 +107,8 @@ class ContentType {
         return '表情';
       case html:
         return 'HTML';
+      case video:
+        return '视频';
       case audio:
         return '语音';
       case call:

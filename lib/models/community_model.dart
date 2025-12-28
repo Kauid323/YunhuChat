@@ -169,3 +169,22 @@ class CommunityGroup {
     );
   }
 }
+
+class CommunitySearchResult {
+  final List<CommunityPartition> partitions;
+  final List<CommunityPost> posts;
+
+  CommunitySearchResult({
+    required this.partitions,
+    required this.posts,
+  });
+
+  factory CommunitySearchResult.fromJson(Map<String, dynamic> json) {
+    final bas = (json['ba'] as List?) ?? const [];
+    final posts = (json['posts'] as List?) ?? const [];
+    return CommunitySearchResult(
+      partitions: bas.map((e) => CommunityPartition.fromJson(e)).toList(),
+      posts: posts.map((e) => CommunityPost.fromJson(e)).toList(),
+    );
+  }
+}

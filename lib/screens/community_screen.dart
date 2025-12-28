@@ -15,6 +15,324 @@ class CommunityScreen extends StatefulWidget {
   State<CommunityScreen> createState() => _CommunityScreenState();
 }
 
+class _CommunitySearchSheet extends StatefulWidget {
+  final ValueChanged<CommunityPartition> onPartitionSelected;
+
+  const _CommunitySearchSheet({
+    required this.onPartitionSelected,
+  });
+
+  @override
+  State<_CommunitySearchSheet> createState() => _CommunitySearchSheetState();
+}
+
+class _CommunitySearchSheetState extends State<_CommunitySearchSheet> {
+  final TextEditingController _controller = TextEditingController();
+  final List<CommunityPartition> _partitions = <CommunityPartition>[];
+  final List<CommunityPost> _results = <CommunityPost>[];
+  bool _isLoading = false;
+  String? _error;
+  String _keyword = '';
+  int _page = 1;
+  bool _hasMore = true;
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels == _scrollController.position.maxScrollExtent) {
+      if (_hasMore && !_isLoading && _keyword.trim().isNotEmpty) {
+        _search(loadMore: true);
+      }
+    }
+  }
+
+  Future<void> _search({bool loadMore = false}) async {
+    final keyword = _controller.text.trim();
+    if (keyword.isEmpty) return;
+
+    if (!loadMore) {
+      setState(() {
+        _keyword = keyword;
+        _page = 1;
+        _hasMore = true;
+        _partitions.clear();
+        _results.clear();
+        _error = null;
+      });
+    }
+
+    if (!_hasMore) return;
+
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      if (!loadMore) {
+        final result = await ApiService.searchCommunity(
+          keyword: _keyword,
+          page: _page,
+          size: 10,
+          typ: 3,
+        );
+        final posts = result?.posts ?? <CommunityPost>[];
+        final bas = result?.partitions ?? <CommunityPartition>[];
+        if (!mounted) return;
+        setState(() {
+          _partitions.addAll(bas);
+          _results.addAll(posts);
+          if (posts.isNotEmpty) {
+            _page++;
+          }
+          _hasMore = posts.isNotEmpty;
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final posts = await ApiService.searchCommunityPosts(
+        keyword: _keyword,
+        page: _page,
+        size: 10,
+        typ: 3,
+      );
+      if (!mounted) return;
+      setState(() {
+        _results.addAll(posts);
+        if (posts.isNotEmpty) {
+          _page++;
+        }
+        _hasMore = posts.isNotEmpty;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  Widget _buildPartitionBlocks(BuildContext context) {
+    if (_partitions.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '分区',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+          ),
+          const SizedBox(height: 12),
+          ..._partitions.asMap().entries.map((entry) {
+            final index = entry.key;
+            final p = entry.value;
+            return Column(
+              children: [
+                InkWell(
+                  onTap: () {
+                    Navigator.pop(context);
+                    widget.onPartitionSelected(p);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 20,
+                          backgroundImage: p.avatar.isNotEmpty
+                              ? ImageLoader.networkImageProvider(p.avatar)
+                              : null,
+                          child: p.avatar.isEmpty
+                              ? const Icon(Icons.grid_view_outlined)
+                              : null,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                p.name,
+                                style: Theme.of(context).textTheme.titleMedium,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '成员: ${p.memberNum}  帖子: ${p.postNum}',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          Icons.chevron_right,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (index != _partitions.length - 1) const Divider(height: 1),
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FractionallySizedBox(
+      heightFactor: 0.95,
+      child: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+              child: Row(
+                children: [
+                  Text(
+                    '搜索',
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: TextField(
+                controller: _controller,
+                autofocus: true,
+                textInputAction: TextInputAction.search,
+                onChanged: (_) {
+                  setState(() {});
+                },
+                onSubmitted: (_) => _search(loadMore: false),
+                textAlignVertical: TextAlignVertical.center,
+                decoration: InputDecoration(
+                  hintText: '搜索文章/分区',
+                  prefixIcon: const Icon(Icons.search),
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_controller.text.isNotEmpty)
+                        IconButton(
+                          onPressed: () {
+                            _controller.clear();
+                            setState(() {
+                              _results.clear();
+                              _keyword = '';
+                              _page = 1;
+                              _hasMore = true;
+                              _error = null;
+                            });
+                          },
+                          icon: const Icon(Icons.clear),
+                        ),
+                      IconButton(
+                        onPressed: _isLoading ? null : () => _search(loadMore: false),
+                        icon: const Icon(Icons.search),
+                      ),
+                    ],
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: _keyword.isEmpty && _results.isEmpty && !_isLoading
+                  ? Center(
+                      child: Text(
+                        '输入关键词开始搜索',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    )
+                  : _error != null
+                      ? Center(
+                          child: Text(
+                            '搜索失败: $_error',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
+                        )
+                      : ListView.separated(
+                          controller: _scrollController,
+                          itemCount: _results.length + 2,
+                          separatorBuilder: (context, index) => const Divider(height: 1),
+                          itemBuilder: (context, index) {
+                            if (index == 0) {
+                              return _buildPartitionBlocks(context);
+                            }
+
+                            if (index == _results.length + 1) {
+                              if (_isLoading) {
+                                return const Padding(
+                                  padding: EdgeInsets.all(16.0),
+                                  child: Center(child: CircularProgressIndicator()),
+                                );
+                              }
+                              if (_results.isEmpty && _keyword.isNotEmpty) {
+                                return Padding(
+                                  padding: const EdgeInsets.all(16.0),
+                                  child: Center(
+                                    child: Text(
+                                      '没有搜索到结果',
+                                      style: TextStyle(
+                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }
+                              return const SizedBox.shrink();
+                            }
+
+                            return CommunityPostItem(post: _results[index - 1]);
+                          },
+                        ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _CommunityScreenState extends State<CommunityScreen> {
   final List<CommunityPost> _posts = [];
   bool _isLoading = false;
@@ -169,6 +487,25 @@ class _CommunityScreenState extends State<CommunityScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 8, 8),
+                child: Row(
+                  children: [
+                    Text(
+                      '更多',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _showCommunitySearchSheet();
+                      },
+                      icon: const Icon(Icons.search),
+                    ),
+                  ],
+                ),
+              ),
               ListTile(
                 leading: const Icon(Icons.local_fire_department_outlined, color: Colors.orange),
                 title: const Text('热门分区'),
@@ -203,6 +540,23 @@ class _CommunityScreenState extends State<CommunityScreen> {
               ),
             ],
           ),
+        );
+      },
+    );
+  }
+
+  void _showCommunitySearchSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return _CommunitySearchSheet(
+          onPartitionSelected: (partition) {
+            setState(() {
+              _baId = partition.id;
+            });
+            _loadPosts(refresh: true);
+          },
         );
       },
     );
