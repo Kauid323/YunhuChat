@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:markdown_widget/markdown_widget.dart';
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
@@ -253,6 +255,54 @@ class _ChatContentState extends State<_ChatContent> {
   ChatProvider? _chatProvider;
   bool _hasSeededKnownIds = false;
 
+  void _openGroupInfo() {
+    final isWindows = !kIsWeb && Platform.isWindows;
+    if (!isWindows) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => GroupInfoScreen(
+            groupId: widget.chatId,
+          ),
+        ),
+      );
+      return;
+    }
+
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'GroupInfo',
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 220),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        final width = MediaQuery.of(context).size.width;
+        final sheetWidth = width >= 1200 ? 520.0 : (width * 0.42).clamp(360.0, 520.0);
+        return Align(
+          alignment: Alignment.centerRight,
+          child: Material(
+            color: Theme.of(context).colorScheme.surface,
+            elevation: 16,
+            child: SizedBox(
+              width: sheetWidth,
+              height: double.infinity,
+              child: GroupInfoScreen(
+                groupId: widget.chatId,
+                showAppBar: false,
+              ),
+            ),
+          ),
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+        return SlideTransition(
+          position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero).animate(curved),
+          child: child,
+        );
+      },
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -404,13 +454,7 @@ class _ChatContentState extends State<_ChatContent> {
                     IconButton(
                       icon: const Icon(Icons.more_vert),
                       onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => GroupInfoScreen(
-                              groupId: widget.chatId,
-                            ),
-                          ),
-                        );
+                        _openGroupInfo();
                       },
                     ),
                 ],

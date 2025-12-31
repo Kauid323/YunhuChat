@@ -6,8 +6,9 @@ import '../utils/image_loader.dart';
 
 class GroupInfoScreen extends StatefulWidget {
   final String groupId;
+  final bool showAppBar;
 
-  const GroupInfoScreen({super.key, required this.groupId});
+  const GroupInfoScreen({super.key, required this.groupId, this.showAppBar = true});
 
   @override
   State<GroupInfoScreen> createState() => _GroupInfoScreenState();
@@ -53,9 +54,11 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('群聊信息'),
-      ),
+      appBar: widget.showAppBar
+          ? AppBar(
+              title: const Text('群聊信息'),
+            )
+          : null,
       body: FutureBuilder<Map<String, dynamic>?>(
         future: _future,
         builder: (context, snapshot) {
@@ -123,8 +126,31 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
           }
 
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: widget.showAppBar ? 16 : 12,
+              bottom: 16,
+            ),
             children: [
+              if (!widget.showAppBar)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          '群聊信息',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.of(context).maybePop(),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                ),
               if (avatarUrl != null && avatarUrl.isNotEmpty)
                 Center(
                   child: ClipRRect(
